@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { LumeLogo } from '@/components/icons/lume-logo'
 import {
   LayoutDashboard,
   Users,
@@ -89,8 +91,8 @@ export default function DashboardLayout({
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <span className="text-lg font-bold text-white">L</span>
+              <div className="w-10 h-10">
+                <LumeLogo className="w-full h-full" />
               </div>
               <span className="font-bold text-xl">Lume</span>
             </Link>
@@ -121,6 +123,7 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">

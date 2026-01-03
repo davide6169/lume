@@ -5,7 +5,8 @@ import { SourceAudience } from '@/types'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, RotateCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Trash2, RotateCw, Copy, Check } from 'lucide-react'
 import { Facebook as FacebookIcon } from '@/components/icons/facebook'
 import { Instagram as InstagramIcon } from '@/components/icons/instagram'
 
@@ -24,6 +25,7 @@ export function SourceAudienceCard({
   onDelete,
 }: SourceAudienceCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const getIcon = () => {
     if (audience.type === 'facebook') {
@@ -54,6 +56,17 @@ export function SourceAudienceCard({
 
   const handleClick = () => {
     setIsFlipped(!isFlipped)
+  }
+
+  const handleCopyUrls = async () => {
+    const urlsText = audience.urls.join('\n')
+    try {
+      await navigator.clipboard.writeText(urlsText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+    }
   }
 
   return (
@@ -142,8 +155,31 @@ export function SourceAudienceCard({
             left: 0,
           }}
         >
-          <div className="p-6 h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto space-y-1">
+          <div className="p-6 h-full flex flex-col relative">
+            {/* Copy button - top right corner */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopyUrls()
+              }}
+              className="absolute top-4 right-4 h-8 px-3 gap-2 z-10"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span className="text-sm">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  <span className="text-sm">Copy URLs</span>
+                </>
+              )}
+            </Button>
+
+            <div className="flex-1 overflow-y-auto space-y-1 mt-8">
               {audience.urls.map((url, index) => (
                 <div
                   key={index}
