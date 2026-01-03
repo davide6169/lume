@@ -6,11 +6,11 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
-import { AlertCircle, Eye, EyeOff, Save, Download, Upload, Sparkles } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AlertCircle, Eye, EyeOff, Save, Download, Upload } from 'lucide-react'
 
 const apiServices = [
   { key: 'meta' as const, name: 'Meta (Facebook/Instagram)', description: 'For accessing social media data' },
@@ -22,10 +22,10 @@ const apiServices = [
 
 export default function SettingsPage() {
   const {
-    demoMode,
-    setDemoMode,
     selectedLlmModel,
     setSelectedLlmModel,
+    selectedEmbeddingModel,
+    setSelectedEmbeddingModel,
     apiKeys,
     setApiKey,
     removeApiKey,
@@ -37,6 +37,8 @@ export default function SettingsPage() {
   const [tempKeys, setTempKeys] = useState(apiKeys)
   const [importJson, setImportJson] = useState('')
   const [saveMessage, setSaveMessage] = useState('')
+  const [exportDialog, setExportDialog] = useState(false)
+  const [exportFileName, setExportFileName] = useState(`lume-settings-${new Date().toISOString().split('T')[0]}.json`)
 
   const handleSaveKeys = () => {
     Object.entries(tempKeys).forEach(([service, key]) => {
@@ -49,14 +51,20 @@ export default function SettingsPage() {
   }
 
   const handleExport = () => {
+    setExportFileName(`lume-settings-${new Date().toISOString().split('T')[0]}.json`)
+    setExportDialog(true)
+  }
+
+  const confirmExport = () => {
     const settings = exportSettings()
     const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'lume-settings.json'
+    a.download = exportFileName
     a.click()
     URL.revokeObjectURL(url)
+    setExportDialog(false)
   }
 
   const handleImport = () => {
@@ -76,69 +84,6 @@ export default function SettingsPage() {
     setShowKeys((prev) => ({ ...prev, [service]: !prev[service] }))
   }
 
-  const handleExportDemoSourceAudiences = () => {
-    const demoData = {
-      sourceAudiences: [
-        {
-          id: crypto.randomUUID(),
-          name: 'Facebook Tech Groups',
-          type: 'facebook',
-          urls: [
-            'https://www.facebook.com/groups/techenthusiasts',
-            'https://www.facebook.com/groups/developerscommunity',
-            'https://www.facebook.com/groups/startupfounders',
-            'https://www.facebook.com/groups/aiandmachinelearning',
-            'https://www.facebook.com/groups/webdevpros',
-          ],
-          selected: true,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: crypto.randomUUID(),
-          name: 'Instagram Business Pages',
-          type: 'instagram',
-          urls: [
-            'https://www.instagram.com/entrepreneurregistry',
-            'https://www.instagram.com/digitalmarketingtips',
-            'https://www.instagram.com/businessinsider',
-            'https://www.instagram.com/startuplife',
-          ],
-          selected: true,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: crypto.randomUUID(),
-          name: 'Facebook Local Communities',
-          type: 'facebook',
-          urls: [
-            'https://www.facebook.com/groups/milanbusinessnetwork',
-            'https://www.facebook.com/groups/romeprofessionals',
-            'https://www.facebook.com/groups/turinstartupscene',
-          ],
-          selected: false,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
-    }
-
-    const blob = new Blob([JSON.stringify(demoData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'lume-demo-source-audiences.json'
-    a.click()
-    URL.revokeObjectURL(url)
-
-    setSaveMessage('Demo data exported! Go to Source Audiences to import it.')
-    setTimeout(() => setSaveMessage(''), 5000)
-  }
-
   return (
     <div className="space-y-8 max-w-4xl">
       {/* Header */}
@@ -149,16 +94,6 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Demo Mode Alert */}
-      {demoMode && (
-        <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800 dark:text-blue-200">
-            <strong>Demo Mode is Active:</strong> All API calls will be simulated with dummy data. No actual API calls will be made.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Save Message */}
       {saveMessage && (
         <Alert className={saveMessage.includes('Error') || saveMessage.includes('Invalid') ? 'border-destructive' : 'border-green-500'}>
@@ -167,10 +102,9 @@ export default function SettingsPage() {
       )}
 
       <Tabs defaultValue="api-keys" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="api-keys">API Keys</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="demo">Demo Mode</TabsTrigger>
           <TabsTrigger value="import-export">Import/Export</TabsTrigger>
         </TabsList>
 
@@ -198,7 +132,6 @@ export default function SettingsPage() {
                       onChange={(e) =>
                         setTempKeys((prev) => ({ ...prev, [service.key]: e.target.value }))
                       }
-                      disabled={demoMode}
                     />
                   </div>
                   <Button
@@ -206,7 +139,6 @@ export default function SettingsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() => toggleShowKey(service.key)}
-                    disabled={demoMode}
                   >
                     {showKeys[service.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -214,16 +146,10 @@ export default function SettingsPage() {
               </div>
             ))}
 
-            <Button onClick={handleSaveKeys} className="w-full" disabled={demoMode}>
+            <Button onClick={handleSaveKeys} className="w-full">
               <Save className="mr-2 h-4 w-4" />
               Save API Keys
             </Button>
-
-            {demoMode && (
-              <p className="text-sm text-muted-foreground text-center">
-                API key management is disabled in demo mode
-              </p>
-            )}
           </Card>
         </TabsContent>
 
@@ -250,76 +176,29 @@ export default function SettingsPage() {
               </p>
             </div>
           </Card>
-        </TabsContent>
 
-        {/* Demo Mode Tab */}
-        <TabsContent value="demo" className="space-y-6">
+          {/* Embedding Settings */}
           <Card className="p-6 space-y-6">
             <div>
-              <h2 className="text-xl font-semibold">Demo Mode</h2>
+              <h2 className="text-xl font-semibold">Embedding Settings</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Enable demo mode to explore the platform without using real API calls
+                Configure the embeddings model used for contact analysis on Mixedbread
               </p>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="demo-mode">Enable Demo Mode</Label>
-                <p className="text-xs text-muted-foreground">
-                  All external API calls will be simulated with dummy data
-                </p>
-              </div>
-              <Switch
-                id="demo-mode"
-                checked={demoMode}
-                onCheckedChange={setDemoMode}
+            <div className="space-y-2">
+              <Label htmlFor="embedding-model">Embedding Model</Label>
+              <Input
+                id="embedding-model"
+                value={selectedEmbeddingModel}
+                onChange={(e) => setSelectedEmbeddingModel(e.target.value)}
+                placeholder="mxbai-embed-large-v1"
               />
-            </div>
-
-            {demoMode && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Demo mode is active. No actual API calls will be made. All data will be simulated.
-                </AlertDescription>
-              </Alert>
-            )}
-          </Card>
-
-          {/* Demo Data Export - Only visible when Demo Mode is active */}
-          {demoMode && (
-            <Card className="p-6 space-y-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950 dark:to-blue-950 border-purple-200 dark:border-purple-800">
-              <div>
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-purple-600" />
-                  Demo Data Generator
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Get started quickly with pre-configured Source Audiences for testing
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Export a JSON file containing <strong>3 example Source Audiences</strong> with Facebook groups and Instagram pages ready to import.
-                </p>
-                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1 ml-4">
-                  <li>• Facebook Tech Groups (5 URLs)</li>
-                  <li>• Instagram Business Pages (4 URLs)</li>
-                  <li>• Facebook Local Communities (3 URLs)</li>
-                </ul>
-              </div>
-
-              <Button onClick={handleExportDemoSourceAudiences} className="w-full">
-                <Download className="mr-2 h-4 w-4" />
-                Export Demo Source Audiences
-              </Button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                After exporting, go to <strong>Source Audiences</strong> → <strong>Import JSON</strong> to load the data
+              <p className="text-xs text-muted-foreground">
+                Default model is mxbai-embed-large-v1. This model is used for semantic search and contact similarity analysis.
               </p>
-            </Card>
-          )}
+            </div>
+          </Card>
         </TabsContent>
 
         {/* Import/Export Tab */}
@@ -365,6 +244,34 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Export Dialog */}
+      <Dialog open={exportDialog} onOpenChange={setExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Settings</DialogTitle>
+            <DialogDescription>
+              Choose a filename for your export. The file will be saved in JSON format.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={exportFileName}
+              onChange={(e) => setExportFileName(e.target.value)}
+              placeholder="filename.json"
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmExport}>
+              Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

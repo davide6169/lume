@@ -252,26 +252,55 @@ async function processAudiences(
       )
 
       if (validContacts.length > 0) {
-        // Create shared audience
-        const { data: sharedAudience } = await supabase
+        // Check if a shared audience already exists for this source
+        const { data: existingShared } = await supabase
           .from('shared_audiences')
-          .insert({
-            user_id: userId,
-            source_audience_id: audience.id,
-            source_audience_type: audience.type,
-            name: audience.name,
-            contacts: validContacts,
-            selected: false,
-            uploaded_to_meta: false,
-          })
-          .select()
+          .select('id')
+          .eq('source_audience_id', audience.id)
+          .eq('user_id', userId)
           .single()
+
+        let sharedAudienceId
+
+        if (existingShared) {
+          // Update existing shared audience with new contacts
+          const { data: updatedShared } = await supabase
+            .from('shared_audiences')
+            .update({
+              contacts: validContacts,
+              selected: false,
+              uploaded_to_meta: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingShared.id)
+            .select()
+            .single()
+
+          sharedAudienceId = updatedShared?.id
+        } else {
+          // Create new shared audience
+          const { data: newSharedAudience } = await supabase
+            .from('shared_audiences')
+            .insert({
+              user_id: userId,
+              source_audience_id: audience.id,
+              source_audience_type: audience.type,
+              name: audience.name,
+              contacts: validContacts,
+              selected: false,
+              uploaded_to_meta: false,
+            })
+            .select()
+            .single()
+
+          sharedAudienceId = newSharedAudience?.id
+        }
 
         results.push({
           audienceId: audience.id,
           audienceName: audience.name,
           contactsFound: validContacts.length,
-          sharedAudienceId: sharedAudience?.id,
+          sharedAudienceId: sharedAudienceId,
         })
 
         // Update source audience status

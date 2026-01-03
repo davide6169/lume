@@ -56,7 +56,8 @@ export interface SharedAudience {
 export interface FilterRule {
   id: string;
   field: string;
-  operator: 'AND' | 'OR' | 'NOT' | 'CONTAINS' | 'EQUALS' | 'GT' | 'LT';
+  operator: 'CONTAINS' | 'EQUALS' | 'NOT' | 'STARTS_WITH' | 'ENDS_WITH' | 'NOT_STARTS_WITH' | 'NOT_ENDS_WITH' | 'GT' | 'LT';
+  logicalOperator?: 'AND' | 'OR';
   value: any;
 }
 
@@ -183,6 +184,7 @@ export interface ExportableSettings {
   };
   demoMode?: boolean;
   selectedLlmModel?: string;
+  selectedEmbeddingModel?: string;
 }
 
 export interface ExportableSourceAudiences {

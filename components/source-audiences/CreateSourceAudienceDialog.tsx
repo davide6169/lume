@@ -80,7 +80,7 @@ export function CreateSourceAudienceDialog({ onCreate }: CreateSourceAudienceDia
           Add Source Audience
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Create Source Audience</DialogTitle>

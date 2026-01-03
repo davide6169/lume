@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { useFiltersStore } from '@/lib/stores/useFiltersStore'
 import { FilterBuilder } from './FilterBuilder'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Plus, Save, Trash2, Upload, Download } from 'lucide-react'
 import type { Filter, FilterRule } from '@/types'
 
@@ -28,6 +28,8 @@ export function FilterManager() {
   const [importJson, setImportJson] = useState('')
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [exportDialog, setExportDialog] = useState(false)
+  const [exportFileName, setExportFileName] = useState(`filters-${new Date().toISOString().split('T')[0]}.json`)
 
   useEffect(() => {
     loadFilters()
@@ -118,14 +120,20 @@ export function FilterManager() {
   }
 
   const handleExport = () => {
+    setExportFileName(`filters-${new Date().toISOString().split('T')[0]}.json`)
+    setExportDialog(true)
+  }
+
+  const confirmExport = () => {
     const json = exportAsJson()
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `filters-${new Date().toISOString().split('T')[0]}.json`
+    a.download = exportFileName
     a.click()
     URL.revokeObjectURL(url)
+    setExportDialog(false)
   }
 
   const handleImport = () => {
@@ -244,18 +252,6 @@ export function FilterManager() {
                   <Button size="sm" variant="outline" className="flex-1" onClick={() => handleLoadFilter(filter)}>
                     Load
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="flex-1"
-                    onClick={() => {
-                      handleLoadFilter(filter)
-                      // Apply filter logic would go here
-                      alert(`Filter "${filter.name}" loaded! Ready to apply to shared audiences.`)
-                    }}
-                  >
-                    Apply
-                  </Button>
                 </div>
               </Card>
             ))}
@@ -288,6 +284,34 @@ export function FilterManager() {
           </div>
         </div>
       )}
+
+      {/* Export Dialog */}
+      <Dialog open={exportDialog} onOpenChange={setExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Filters</DialogTitle>
+            <DialogDescription>
+              Choose a filename for your export. The file will be saved in JSON format.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={exportFileName}
+              onChange={(e) => setExportFileName(e.target.value)}
+              placeholder="filename.json"
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmExport}>
+              Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

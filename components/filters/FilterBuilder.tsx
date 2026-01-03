@@ -32,17 +32,38 @@ const OPERATORS = [
   { value: 'CONTAINS', label: 'Contains' },
   { value: 'EQUALS', label: 'Equals' },
   { value: 'NOT', label: 'Does Not Equal' },
+  { value: 'STARTS_WITH', label: 'Starts With' },
+  { value: 'ENDS_WITH', label: 'Ends With' },
+  { value: 'NOT_STARTS_WITH', label: 'Does Not Start With' },
+  { value: 'NOT_ENDS_WITH', label: 'Does Not End With' },
   { value: 'GT', label: 'Greater Than' },
   { value: 'LT', label: 'Less Than' },
+]
+
+const LOGICAL_OPERATORS = [
+  { value: 'AND', label: 'AND' },
+  { value: 'OR', label: 'OR' },
 ]
 
 function FilterRuleRow({ rule, index, onUpdate, onRemove, showRemove }: FilterRuleRowProps) {
   return (
     <div className="flex items-center gap-2 p-4 border rounded-lg bg-card">
       {index > 0 && (
-        <span className="text-sm text-muted-foreground px-2">
-          {rule.operator === 'NOT' ? 'AND NOT' : 'AND'}
-        </span>
+        <Select
+          value={rule.logicalOperator || 'AND'}
+          onValueChange={(value) => onUpdate(index, { ...rule, logicalOperator: value as 'AND' | 'OR' })}
+        >
+          <SelectTrigger className="w-20">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LOGICAL_OPERATORS.map((op) => (
+              <SelectItem key={op.value} value={op.value}>
+                {op.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
 
       <Select
@@ -65,7 +86,7 @@ function FilterRuleRow({ rule, index, onUpdate, onRemove, showRemove }: FilterRu
         value={rule.operator}
         onValueChange={(value) => onUpdate(index, { ...rule, operator: value as FilterRule['operator'] })}
       >
-        <SelectTrigger className="w-36">
+        <SelectTrigger className="w-48">
           <SelectValue placeholder="Operator" />
         </SelectTrigger>
         <SelectContent>
@@ -109,6 +130,7 @@ export function FilterBuilder({ rules, onChange }: FilterBuilderProps) {
       id: crypto.randomUUID(),
       field: 'firstName',
       operator: 'CONTAINS',
+      logicalOperator: 'AND',
       value: '',
     }
     onChange([...rules, newRule])
@@ -187,7 +209,7 @@ export function FilterBuilder({ rules, onChange }: FilterBuilderProps) {
           <div className="text-sm font-mono space-y-1">
             {rules.map((rule, index) => (
               <div key={rule.id} className="flex items-center gap-2">
-                {index > 0 && <span className="text-muted-foreground">{rule.operator === 'NOT' ? 'AND NOT' : 'AND'}</span>}
+                {index > 0 && <span className="text-muted-foreground">{rule.logicalOperator || 'AND'}</span>}
                 <span>{rule.field}</span>
                 <span className="text-muted-foreground">{rule.operator}</span>
                 <span className="font-medium">"{rule.value || '<empty>'}"</span>

@@ -107,9 +107,9 @@ export default function DashboardLayout({
                 return (
                   <Link key={item.href} href={item.href}>
                     <Button
-                      variant={isActive ? 'secondary' : 'ghost'}
+                      variant="ghost"
                       size="sm"
-                      className="gap-2"
+                      className={`gap-2 ${isActive ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}`}
                     >
                       <Icon className="h-4 w-4" />
                       {item.name}

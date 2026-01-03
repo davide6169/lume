@@ -11,6 +11,10 @@ interface SettingsState {
   selectedLlmModel: string
   setSelectedLlmModel: (model: string) => void
 
+  // Embedding Settings
+  selectedEmbeddingModel: string
+  setSelectedEmbeddingModel: (model: string) => void
+
   // API Keys (encrypted, stored client-side)
   apiKeys: {
     meta?: string
@@ -34,6 +38,7 @@ interface SettingsState {
 const defaultSettings = {
   demoMode: true,
   selectedLlmModel: 'mistral-7b-instruct:free',
+  selectedEmbeddingModel: 'mxbai-embed-large-v1',
   apiKeys: {},
 }
 
@@ -45,6 +50,8 @@ export const useSettingsStore = create<SettingsState>()(
       setDemoMode: (enabled) => set({ demoMode: enabled }),
 
       setSelectedLlmModel: (model) => set({ selectedLlmModel: model }),
+
+      setSelectedEmbeddingModel: (model) => set({ selectedEmbeddingModel: model }),
 
       setApiKey: (service, key) =>
         set((state) => ({
@@ -59,11 +66,12 @@ export const useSettingsStore = create<SettingsState>()(
         }),
 
       exportSettings: () => {
-        const { apiKeys, demoMode, selectedLlmModel } = get()
+        const { apiKeys, demoMode, selectedLlmModel, selectedEmbeddingModel } = get()
         return {
           apiKeys,
           demoMode,
           selectedLlmModel,
+          selectedEmbeddingModel,
         }
       },
 
@@ -72,6 +80,7 @@ export const useSettingsStore = create<SettingsState>()(
           apiKeys: settings.apiKeys || {},
           demoMode: settings.demoMode ?? true,
           selectedLlmModel: settings.selectedLlmModel || 'mistral-7b-instruct:free',
+          selectedEmbeddingModel: settings.selectedEmbeddingModel || 'mxbai-embed-large-v1',
         })
       },
 

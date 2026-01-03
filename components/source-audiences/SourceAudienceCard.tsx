@@ -90,6 +90,7 @@ export function SourceAudienceCard({
                     onToggleSelect()
                   }}
                   onClick={(e) => e.stopPropagation()}
+                  className="h-6 w-6 border-2 border-primary"
                 />
                 <div className="flex items-center gap-3">
                   {getIcon()}

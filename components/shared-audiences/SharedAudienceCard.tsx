@@ -12,6 +12,9 @@ interface SharedAudienceCardProps {
   selected: boolean
   onToggleSelect: () => void
   onDelete: () => void
+  isFiltered?: boolean
+  hasNoContacts?: boolean
+  originalContactCount?: number
 }
 
 export function SharedAudienceCard({
@@ -19,6 +22,9 @@ export function SharedAudienceCard({
   selected,
   onToggleSelect,
   onDelete,
+  isFiltered = false,
+  hasNoContacts = false,
+  originalContactCount = 0,
 }: SharedAudienceCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
 
@@ -42,9 +48,13 @@ export function SharedAudienceCard({
   // Colore base in base al tipo della Source Audience
   const getCardColor = () => {
     if (audience.sourceAudienceType === 'facebook') {
-      return 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
+      return isFiltered
+        ? 'bg-blue-50 dark:bg-blue-950 border-orange-400 dark:border-orange-500 border-2'
+        : 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
     }
-    return 'bg-pink-50 dark:bg-pink-950 border-pink-200 dark:border-pink-800'
+    return isFiltered
+      ? 'bg-pink-50 dark:bg-pink-950 border-orange-400 dark:border-orange-500 border-2'
+      : 'bg-pink-50 dark:bg-pink-950 border-pink-200 dark:border-pink-800'
   }
 
   const handleClick = () => {
@@ -85,6 +95,8 @@ export function SharedAudienceCard({
                     onToggleSelect()
                   }}
                   onClick={(e) => e.stopPropagation()}
+                  disabled={hasNoContacts}
+                  className="h-6 w-6 border-2 border-primary"
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -95,11 +107,27 @@ export function SharedAudienceCard({
                         Uploaded
                       </Badge>
                     )}
+                    {hasNoContacts && (
+                      <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-300">
+                        No matches
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
-                      <span className="font-medium text-foreground">{audience.contacts.length}</span> {audience.contacts.length === 1 ? 'contact' : 'contacts'}
+                      {isFiltered ? (
+                        <>
+                          <span className="font-medium text-foreground">{audience.contacts.length}</span>
+                          <span>of {originalContactCount}</span>
+                          <span>{audience.contacts.length === 1 ? 'contact' : 'contacts'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-medium text-foreground">{audience.contacts.length}</span>
+                          <span>{audience.contacts.length === 1 ? 'contact' : 'contacts'}</span>
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
