@@ -1,0 +1,180 @@
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { getDemoModeService } from '@/lib/services/demo-mode'
+
+// POST - Start search process for selected source audiences
+export async function POST(request: Request) {
+  try {
+    const supabase = await createSupabaseServerClient()
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { sourceAudienceIds } = body
+
+    if (!Array.isArray(sourceAudienceIds) || sourceAudienceIds.length === 0) {
+      return NextResponse.json({ error: 'No source audiences selected' }, { status: 400 })
+    }
+
+    // Fetch the source audiences
+    const { data: audiences, error: fetchError } = await supabase
+      .from('source_audiences')
+      .select('*')
+      .in('id', sourceAudienceIds)
+      .eq('user_id', user.id)
+
+    if (fetchError) {
+      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+    }
+
+    if (!audiences || audiences.length === 0) {
+      return NextResponse.json({ error: 'No valid audiences found' }, { status: 404 })
+    }
+
+    // Get user settings to check demo mode
+    const { data: settings } = await supabase
+      .from('settings')
+      .select('demo_mode')
+      .eq('user_id', user.id)
+      .single()
+
+    const isDemoMode = settings?.demo_mode ?? true
+
+    // Start the search process asynchronously
+    const jobId = crypto.randomUUID()
+
+    // Process in background (for now, we'll do it synchronously but in production you'd use a queue)
+    const results = await processAudiences(audiences, user.id, isDemoMode, supabase)
+
+    return NextResponse.json({
+      jobId,
+      message: 'Search completed',
+      results,
+    })
+  } catch (error) {
+    console.error('Search error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+async function processAudiences(
+  audiences: any[],
+  userId: string,
+  isDemoMode: boolean,
+  supabase: any
+) {
+  const demoModeService = getDemoModeService()
+  const results = []
+
+  for (const audience of audiences) {
+    try {
+      // Update status to processing
+      await supabase
+        .from('source_audiences')
+        .update({ status: 'processing' })
+        .eq('id', audience.id)
+
+      let contacts = []
+
+      if (isDemoMode) {
+        // Use demo mode
+        await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate processing
+        contacts = await demoModeService.getDemoContacts(audience.urls.length)
+
+        // Calculate demo costs
+        const costs = demoModeService.calculateCosts(audience.urls.length, contacts.length)
+
+        // Store costs
+        for (const cost of costs) {
+          await supabase.from('cost_tracking').insert({
+            user_id: userId,
+            service: cost.service,
+            operation: cost.operation,
+            cost: cost.cost,
+          })
+        }
+      } else {
+        // Real implementation would call actual APIs
+        // For now, we'll use demo mode as fallback
+        contacts = await demoModeService.getDemoContacts(audience.urls.length)
+      }
+
+      // Validate contacts have minimum required fields
+      const validContacts = contacts.filter(
+        (c: any) => c.firstName && c.lastName && c.email
+      )
+
+      if (validContacts.length > 0) {
+        // Create shared audience
+        const { data: sharedAudience } = await supabase
+          .from('shared_audiences')
+          .insert({
+            user_id: userId,
+            source_audience_id: audience.id,
+            name: audience.name,
+            contacts: validContacts,
+            selected: false,
+            uploaded_to_meta: false,
+          })
+          .select()
+          .single()
+
+        results.push({
+          audienceId: audience.id,
+          audienceName: audience.name,
+          contactsFound: validContacts.length,
+          sharedAudienceId: sharedAudience?.id,
+        })
+
+        // Update source audience status
+        await supabase
+          .from('source_audiences')
+          .update({ status: 'completed' })
+          .eq('id', audience.id)
+      } else {
+        // No valid contacts found
+        await supabase
+          .from('source_audiences')
+          .update({ status: 'completed', error_message: 'No valid contacts found' })
+          .eq('id', audience.id)
+
+        results.push({
+          audienceId: audience.id,
+          audienceName: audience.name,
+          contactsFound: 0,
+          error: 'No valid contacts found',
+        })
+      }
+    } catch (error: any) {
+      console.error(`Error processing audience ${audience.id}:`, error)
+
+      // Update status to failed
+      await supabase
+        .from('source_audiences')
+        .update({
+          status: 'failed',
+          error_message: error.message || 'Unknown error',
+        })
+        .eq('id', audience.id)
+
+      results.push({
+        audienceId: audience.id,
+        audienceName: audience.name,
+        contactsFound: 0,
+        error: error.message || 'Unknown error',
+      })
+    }
+  }
+
+  return results
+}

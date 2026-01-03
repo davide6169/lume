@@ -1,0 +1,328 @@
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { ensureProfileExists } from '@/lib/supabase/queries'
+import { NextResponse } from 'next/server'
+
+// GET - Fetch all source audiences for current user
+export async function GET() {
+  try {
+    const supabase = await createSupabaseServerClient()
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // Ensure profile exists
+    await ensureProfileExists(user.id, user.email)
+
+    const { data, error } = await supabase
+      .from('source_audiences')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ sourceAudiences: data })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Create new source audience OR search
+export async function POST(request: Request) {
+  console.log('POST /api/source-audiences called')
+
+  try {
+    const supabase = await createSupabaseServerClient()
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      console.log('User not authenticated')
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    console.log('User authenticated:', user.id)
+
+    const body = await request.json()
+    console.log('Request body:', body)
+
+    // Check if this is a search request
+    if (body.action === 'search' || body.sourceAudienceIds) {
+      console.log('Processing search request')
+      const { sourceAudienceIds } = body
+
+      if (!Array.isArray(sourceAudienceIds) || sourceAudienceIds.length === 0) {
+        console.log('No source audiences selected')
+        return NextResponse.json({ error: 'No source audiences selected' }, { status: 400 })
+      }
+
+      console.log('Fetching audiences:', sourceAudienceIds)
+
+      // Fetch the source audiences
+      const { data: audiences, error: fetchError } = await supabase
+        .from('source_audiences')
+        .select('*')
+        .in('id', sourceAudienceIds)
+        .eq('user_id', user.id)
+
+      if (fetchError) {
+        console.error('Fetch audiences error:', fetchError)
+        return NextResponse.json({ error: fetchError.message }, { status: 500 })
+      }
+
+      if (!audiences || audiences.length === 0) {
+        console.log('No valid audiences found')
+        return NextResponse.json({ error: 'No valid audiences found' }, { status: 404 })
+      }
+
+      console.log('Found audiences:', audiences.length)
+
+      // Process audiences
+      const results = await processAudiences(audiences, user.id, supabase)
+
+      console.log('Search completed, results:', results)
+
+      return NextResponse.json({
+        message: 'Search completed',
+        results,
+      })
+    }
+
+    console.log('Creating new source audience')
+    // Create new source audience
+    const { data, error } = await supabase
+      .from('source_audiences')
+      .insert({
+        user_id: user.id,
+        name: body.name,
+        type: body.type,
+        urls: body.urls,
+        selected: true, // Auto-select on creation
+        status: 'pending',
+      })
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error('POST error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Delete source audiences
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createSupabaseServerClient()
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { ids } = body
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'Invalid IDs' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from('source_audiences')
+      .delete()
+      .in('id', ids)
+      .eq('user_id', user.id) // Ensure user can only delete their own audiences
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH - Update source audience
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createSupabaseServerClient()
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { id, ...updates } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('source_audiences')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', user.id) // Ensure user can only update their own audiences
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// Helper function to process audiences
+async function processAudiences(
+  audiences: any[],
+  userId: string,
+  supabase: any
+) {
+  const results = []
+
+  for (const audience of audiences) {
+    try {
+      console.log(`Processing audience: ${audience.name}`)
+
+      // Update status to processing
+      await supabase
+        .from('source_audiences')
+        .update({ status: 'processing' })
+        .eq('id', audience.id)
+
+      // Simulate processing
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Generate demo contacts
+      const contacts = generateDemoContacts(audience.urls.length)
+
+      // Validate contacts
+      const validContacts = contacts.filter(
+        (c: any) => c.firstName && c.lastName && c.email
+      )
+
+      if (validContacts.length > 0) {
+        // Create shared audience
+        const { data: sharedAudience } = await supabase
+          .from('shared_audiences')
+          .insert({
+            user_id: userId,
+            source_audience_id: audience.id,
+            name: audience.name,
+            contacts: validContacts,
+            selected: false,
+            uploaded_to_meta: false,
+          })
+          .select()
+          .single()
+
+        results.push({
+          audienceId: audience.id,
+          audienceName: audience.name,
+          contactsFound: validContacts.length,
+          sharedAudienceId: sharedAudience?.id,
+        })
+
+        // Update source audience status
+        await supabase
+          .from('source_audiences')
+          .update({ status: 'completed' })
+          .eq('id', audience.id)
+      } else {
+        await supabase
+          .from('source_audiences')
+          .update({ status: 'completed' })
+          .eq('id', audience.id)
+
+        results.push({
+          audienceId: audience.id,
+          audienceName: audience.name,
+          contactsFound: 0,
+        })
+      }
+    } catch (error: any) {
+      console.error(`Error processing audience ${audience.id}:`, error)
+
+      await supabase
+        .from('source_audiences')
+        .update({
+          status: 'failed',
+          error_message: error.message || 'Unknown error',
+        })
+        .eq('id', audience.id)
+
+      results.push({
+        audienceId: audience.id,
+        audienceName: audience.name,
+        contactsFound: 0,
+        error: error.message || 'Unknown error',
+      })
+    }
+  }
+
+  return results
+}
+
+function generateDemoContacts(urlCount: number) {
+  const contacts = []
+  const countPerUrl = 3
+
+  for (let i = 0; i < urlCount * countPerUrl; i++) {
+    const id = i + 1
+    contacts.push({
+      firstName: `FirstName${id}`,
+      lastName: `LastName${id}`,
+      email: `contact${id}@example.com`,
+      phone: `+12345678${id.toString().padStart(2, '0')}`,
+      city: 'Milan',
+      country: 'Italy',
+      interests: ['technology', 'business', 'marketing'].slice(0, Math.floor(Math.random() * 3) + 1),
+    })
+  }
+
+  return contacts
+}
