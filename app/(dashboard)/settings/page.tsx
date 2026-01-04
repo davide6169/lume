@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertCircle, Eye, EyeOff, Save, Download, Upload } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText } from 'lucide-react'
 
 const apiServices = [
   { key: 'meta' as const, name: 'Meta (Facebook/Instagram)', description: 'For accessing social media data' },
@@ -22,6 +23,10 @@ const apiServices = [
 
 export default function SettingsPage() {
   const {
+    demoMode,
+    setDemoMode,
+    logsEnabled,
+    setLogsEnabled,
     selectedLlmModel,
     setSelectedLlmModel,
     selectedEmbeddingModel,
@@ -155,6 +160,54 @@ export default function SettingsPage() {
 
         {/* Preferences Tab */}
         <TabsContent value="preferences" className="space-y-6">
+          {/* General Settings */}
+          <Card className="p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold">General Settings</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure application behavior and modes
+              </p>
+            </div>
+
+            {/* Demo Mode Switch */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="demo-mode">Demo Mode</Label>
+                <p className="text-xs text-muted-foreground">
+                  Use demo data instead of real API calls. Recommended for testing.
+                </p>
+              </div>
+              <Switch
+                id="demo-mode"
+                checked={demoMode}
+                onCheckedChange={(checked) => {
+                  setDemoMode(checked)
+                  setSaveMessage('Demo mode ' + (checked ? 'enabled' : 'disabled'))
+                  setTimeout(() => setSaveMessage(''), 3000)
+                }}
+              />
+            </div>
+
+            {/* Logs Enabled Switch */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="logs-enabled">Enable Logging</Label>
+                <p className="text-xs text-muted-foreground">
+                  Save system logs for debugging and monitoring. Admin-only access.
+                </p>
+              </div>
+              <Switch
+                id="logs-enabled"
+                checked={logsEnabled}
+                onCheckedChange={(checked) => {
+                  setLogsEnabled(checked)
+                  setSaveMessage('Logging ' + (checked ? 'enabled' : 'disabled'))
+                  setTimeout(() => setSaveMessage(''), 3000)
+                }}
+              />
+            </div>
+          </Card>
+
           <Card className="p-6 space-y-6">
             <div>
               <h2 className="text-xl font-semibold">LLM Settings</h2>

@@ -342,37 +342,6 @@ export function SharedAudienceList() {
 
   return (
     <div className="space-y-6">
-      {/* Demo Mode Toggle */}
-      <Alert className={`${isDemoMode ? 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800' : 'bg-gray-50 dark:bg-gray-950 border-gray-200 dark:border-gray-800'}`}>
-        <Sparkles className={`h-4 w-4 ${isDemoMode ? 'text-purple-600' : 'text-gray-600'}`} />
-        <AlertDescription className="flex items-center justify-between">
-          <div>
-            <span className="font-semibold">
-              {isDemoMode ? 'Demo Mode Active' : 'Demo Mode Off'}
-            </span>
-            <span className="text-sm ml-2 text-muted-foreground">
-              {isDemoMode
-                ? 'Using simulated data - no database changes'
-                : 'Using real database - all changes will be saved'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={isDemoMode}
-              onCheckedChange={(enabled) => {
-                setIsDemoMode(enabled)
-                if (!enabled) {
-                  clearDemoSharedAudiences()
-                }
-              }}
-            />
-            <span className="text-sm text-muted-foreground">
-              {isDemoMode ? 'ON' : 'OFF'}
-            </span>
-          </div>
-        </AlertDescription>
-      </Alert>
-
       {/* Active Filter Alert */}
       {activeFilter && (
         <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">

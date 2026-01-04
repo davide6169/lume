@@ -1,9 +1,12 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout } from '@/app/auth/actions'
 import { useSupabase } from '@/components/providers/supabase-provider'
+import { useSettingsStore } from '@/lib/stores/useSettingsStore'
+import { useDemoStore } from '@/lib/stores/useDemoStore'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -15,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LumeLogo } from '@/components/icons/lume-logo'
 import {
@@ -29,6 +33,7 @@ import {
   X,
   Facebook,
   Instagram,
+  Sparkles,
 } from 'lucide-react'
 
 const navItems = [
@@ -74,6 +79,14 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const { profile } = useSupabase()
+  const { logsEnabled } = useSettingsStore()
+  const { isDemoMode, setIsDemoMode } = useDemoStore()
+  const [mounted, setMounted] = useState(false)
+
+  // Ensure client-side hydration is complete before using logsEnabled
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const userInitials = profile?.fullName
     ? profile.fullName
@@ -103,6 +116,12 @@ export default function DashboardLayout({
                   return null
                 }
 
+                // Hide Logs if logging is disabled (even for admins)
+                // Only apply this check after client-side hydration to avoid mismatch
+                if (item.name === 'Logs' && mounted && !logsEnabled) {
+                  return null
+                }
+
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 const Icon = item.icon
 
@@ -119,6 +138,19 @@ export default function DashboardLayout({
                   </Link>
                 )
               })}
+              <Separator orientation="vertical" className="h-6 mx-2" />
+              {/* Demo Mode Switch */}
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-md ${isDemoMode ? 'bg-purple-50 dark:bg-purple-950' : 'bg-gray-50 dark:bg-gray-950'}`}>
+                <Sparkles className={`h-4 w-4 ${isDemoMode ? 'text-purple-600' : 'text-gray-600'}`} />
+                <span className="text-sm font-medium">Demo Mode</span>
+                <Switch
+                  checked={isDemoMode}
+                  onCheckedChange={(checked) => setIsDemoMode(checked)}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {isDemoMode ? 'ON' : 'OFF'}
+                </span>
+              </div>
             </nav>
           </div>
 

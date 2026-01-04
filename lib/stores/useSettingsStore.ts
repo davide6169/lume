@@ -7,6 +7,10 @@ interface SettingsState {
   demoMode: boolean
   setDemoMode: (enabled: boolean) => void
 
+  // Logs enabled
+  logsEnabled: boolean
+  setLogsEnabled: (enabled: boolean) => void
+
   // LLM Settings
   selectedLlmModel: string
   setSelectedLlmModel: (model: string) => void
@@ -37,6 +41,7 @@ interface SettingsState {
 
 const defaultSettings = {
   demoMode: true,
+  logsEnabled: true, // Enabled by default in demo mode
   selectedLlmModel: 'mistral-7b-instruct:free',
   selectedEmbeddingModel: 'mxbai-embed-large-v1',
   apiKeys: {},
@@ -47,7 +52,16 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       ...defaultSettings,
 
-      setDemoMode: (enabled) => set({ demoMode: enabled }),
+      setDemoMode: (enabled) => {
+        // When switching to demo mode, enable logs by default
+        // When switching to production, disable logs by default
+        set({
+          demoMode: enabled,
+          logsEnabled: enabled,
+        })
+      },
+
+      setLogsEnabled: (enabled) => set({ logsEnabled: enabled }),
 
       setSelectedLlmModel: (model) => set({ selectedLlmModel: model }),
 
@@ -66,10 +80,11 @@ export const useSettingsStore = create<SettingsState>()(
         }),
 
       exportSettings: () => {
-        const { apiKeys, demoMode, selectedLlmModel, selectedEmbeddingModel } = get()
+        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel } = get()
         return {
           apiKeys,
           demoMode,
+          logsEnabled,
           selectedLlmModel,
           selectedEmbeddingModel,
         }
@@ -79,6 +94,7 @@ export const useSettingsStore = create<SettingsState>()(
         set({
           apiKeys: settings.apiKeys || {},
           demoMode: settings.demoMode ?? true,
+          logsEnabled: settings.logsEnabled ?? (settings.demoMode ?? true), // Default based on demo mode
           selectedLlmModel: settings.selectedLlmModel || 'mistral-7b-instruct:free',
           selectedEmbeddingModel: settings.selectedEmbeddingModel || 'mxbai-embed-large-v1',
         })

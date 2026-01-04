@@ -1,6 +1,42 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ensureProfileExists } from '@/lib/supabase/queries'
 import { NextResponse } from 'next/server'
+import { MetaGraphAPIService } from '@/lib/services/meta-graphapi'
+import { MetaGraphAPIStubService } from '@/lib/services/meta-graphapi-stub'
+import { ContactExtractorService } from '@/lib/services/contact-extractor'
+import { Contact } from '@/types'
+
+// Helper function to create log entry
+async function createLogEntry(
+  supabase: any,
+  userId: string,
+  level: 'info' | 'warn' | 'error' | 'debug',
+  message: string,
+  metadata?: Record<string, any>
+) {
+  try {
+    // Check if logging is enabled before creating log entry
+    const { data: settings } = await supabase
+      .from('settings')
+      .select('logs_enabled')
+      .eq('user_id', userId)
+      .single()
+
+    // Only create log if logging is enabled
+    if (!settings?.logs_enabled) {
+      return
+    }
+
+    await supabase.from('logs').insert({
+      user_id: userId,
+      level,
+      message,
+      metadata: metadata || {},
+    })
+  } catch (error) {
+    console.error('Failed to create log entry:', error)
+  }
+}
 
 // GET - Fetch all source audiences for current user
 export async function GET() {
@@ -230,9 +266,39 @@ async function processAudiences(
 ) {
   const results = []
 
+  // Fetch settings to check demo mode
+  const { data: settings } = await supabase
+    .from('settings')
+    .select('demo_mode, encrypted_keys')
+    .eq('user_id', userId)
+    .single()
+
+  const isDemoMode = settings?.demo_mode ?? true
+  const metaApiKey = settings?.encrypted_keys?.meta
+
+  console.log(`Demo mode: ${isDemoMode}, Meta API key present: ${!!metaApiKey}`)
+
+  // Log search start
+  await createLogEntry(
+    supabase,
+    userId,
+    'info',
+    `Started processing ${audiences.length} audience(s)`,
+    { audienceNames: audiences.map(a => a.name), demoMode: isDemoMode }
+  )
+
   for (const audience of audiences) {
     try {
       console.log(`Processing audience: ${audience.name}`)
+
+      // Log audience processing start
+      await createLogEntry(
+        supabase,
+        userId,
+        'info',
+        `Processing audience: ${audience.name}`,
+        { audienceId: audience.id, urlCount: audience.urls.length }
+      )
 
       // Update status to processing
       await supabase
@@ -240,18 +306,230 @@ async function processAudiences(
         .update({ status: 'processing' })
         .eq('id', audience.id)
 
-      // Simulate processing
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      let contacts: Contact[] = []
 
-      // Generate demo contacts
-      const contacts = generateDemoContacts(audience.urls.length)
+      if (isDemoMode || !metaApiKey) {
+        // DEMO MODE: Use Meta GraphAPI Stub
+        console.log('Using DEMO MODE (Meta GraphAPI Stub) for audience:', audience.name)
+
+        await createLogEntry(
+          supabase,
+          userId,
+          'info',
+          `[DEMO MODE] Processing ${audience.urls.length} URL(s) for ${audience.name}`,
+          { urls: audience.urls }
+        )
+
+        const stubService = new MetaGraphAPIStubService()
+        const extractor = new ContactExtractorService()
+
+        for (const url of audience.urls) {
+          try {
+            console.log(`Processing URL: ${url}`)
+            const parsed = stubService.parseUrl(url)
+
+            await createLogEntry(
+              supabase,
+              userId,
+              'debug',
+              `[DEMO] Processing ${parsed.platform} URL: ${url}`,
+              { platform: parsed.platform, id: parsed.id }
+            )
+
+            if (parsed.platform === 'facebook') {
+              console.log(`[DEMO] Fetching Facebook posts for ID: ${parsed.id}`)
+              const posts = await stubService.fetchFacebookPosts(parsed.id)
+              console.log(`[DEMO] Found ${posts.length} posts`)
+
+              await createLogEntry(
+                supabase,
+                userId,
+                'debug',
+                `[DEMO] Found ${posts.length} Facebook posts`,
+                { pageId: parsed.id, postCount: posts.length }
+              )
+
+              for (const post of posts) {
+                const comments = await stubService.fetchFacebookComments(post.id)
+                console.log(`[DEMO] Post ${post.id} has ${comments.length} comments`)
+                contacts.push(...extractor.extractFromFacebook(comments))
+
+                await createLogEntry(
+                  supabase,
+                  userId,
+                  'debug',
+                  `[DEMO] Extracted ${comments.length} comments from post`,
+                  { postId: post.id, commentCount: comments.length }
+                )
+              }
+            } else if (parsed.platform === 'instagram') {
+              console.log(`[DEMO] Fetching Instagram business account for username: ${parsed.username}`)
+              const businessAccountId = await stubService.getInstagramBusinessAccount(parsed.username!)
+              console.log(`[DEMO] Business account ID: ${businessAccountId}`)
+
+              const mediaItems = await stubService.fetchInstagramMedia(businessAccountId)
+              console.log(`[DEMO] Found ${mediaItems.length} media items`)
+
+              await createLogEntry(
+                supabase,
+                userId,
+                'debug',
+                `[DEMO] Found ${mediaItems.length} Instagram media items`,
+                { businessAccountId, mediaCount: mediaItems.length }
+              )
+
+              for (const media of mediaItems) {
+                const comments = await stubService.fetchInstagramComments(media.id)
+                console.log(`[DEMO] Media ${media.id} has ${comments.length} comments`)
+                contacts.push(...extractor.extractFromInstagram(comments))
+
+                await createLogEntry(
+                  supabase,
+                  userId,
+                  'debug',
+                  `[DEMO] Extracted ${comments.length} comments from media`,
+                  { mediaId: media.id, commentCount: comments.length }
+                )
+              }
+            }
+          } catch (urlError: any) {
+            console.error(`[DEMO] Error processing URL ${url}:`, urlError)
+
+            await createLogEntry(
+              supabase,
+              userId,
+              'warn',
+              `[DEMO] Error processing URL: ${url}`,
+              { url, error: urlError.message }
+            )
+
+            // Continue with next URL (partial success)
+          }
+        }
+      } else {
+        // PRODUCTION: Use real GraphAPI
+        console.log('Using PRODUCTION GraphAPI for audience:', audience.name)
+
+        await createLogEntry(
+          supabase,
+          userId,
+          'info',
+          `[PRODUCTION] Processing ${audience.urls.length} URL(s) for ${audience.name}`,
+          { urls: audience.urls }
+        )
+
+        const metaService = new MetaGraphAPIService(metaApiKey)
+        const extractor = new ContactExtractorService()
+
+        for (const url of audience.urls) {
+          try {
+            console.log(`Processing URL: ${url}`)
+            const parsed = metaService.parseUrl(url)
+
+            await createLogEntry(
+              supabase,
+              userId,
+              'debug',
+              `[PRODUCTION] Processing ${parsed.platform} URL: ${url}`,
+              { platform: parsed.platform, id: parsed.id }
+            )
+
+            if (parsed.platform === 'facebook') {
+              console.log(`Fetching Facebook posts for ID: ${parsed.id}`)
+              const posts = await metaService.fetchFacebookPosts(parsed.id)
+              console.log(`Found ${posts.length} posts`)
+
+              await createLogEntry(
+                supabase,
+                userId,
+                'debug',
+                `[PRODUCTION] Found ${posts.length} Facebook posts`,
+                { pageId: parsed.id, postCount: posts.length }
+              )
+
+              for (const post of posts) {
+                const comments = await metaService.fetchFacebookComments(post.id)
+                console.log(`Post ${post.id} has ${comments.length} comments`)
+                contacts.push(...extractor.extractFromFacebook(comments))
+
+                await createLogEntry(
+                  supabase,
+                  userId,
+                  'debug',
+                  `[PRODUCTION] Extracted ${comments.length} comments from post`,
+                  { postId: post.id, commentCount: comments.length }
+                )
+              }
+            } else if (parsed.platform === 'instagram') {
+              console.log(`Fetching Instagram business account for username: ${parsed.username}`)
+              const businessAccountId = await metaService.getInstagramBusinessAccount(parsed.username!)
+              console.log(`Business account ID: ${businessAccountId}`)
+
+              const mediaItems = await metaService.fetchInstagramMedia(businessAccountId)
+              console.log(`Found ${mediaItems.length} media items`)
+
+              await createLogEntry(
+                supabase,
+                userId,
+                'debug',
+                `[PRODUCTION] Found ${mediaItems.length} Instagram media items`,
+                { businessAccountId, mediaCount: mediaItems.length }
+              )
+
+              for (const media of mediaItems) {
+                const comments = await metaService.fetchInstagramComments(media.id)
+                console.log(`Media ${media.id} has ${comments.length} comments`)
+                contacts.push(...extractor.extractFromInstagram(comments))
+
+                await createLogEntry(
+                  supabase,
+                  userId,
+                  'debug',
+                  `[PRODUCTION] Extracted ${comments.length} comments from media`,
+                  { mediaId: media.id, commentCount: comments.length }
+                )
+              }
+            }
+          } catch (urlError: any) {
+            console.error(`Error processing URL ${url}:`, urlError)
+
+            await createLogEntry(
+              supabase,
+              userId,
+              'warn',
+              `[PRODUCTION] Error processing URL: ${url}`,
+              { url, error: urlError.message }
+            )
+
+            // Continue with next URL (partial success)
+          }
+        }
+      }
 
       // Validate contacts
       const validContacts = contacts.filter(
-        (c: any) => c.firstName && c.lastName && c.email
+        (c: Contact) => c.firstName && c.lastName && c.email
       )
 
-      if (validContacts.length > 0) {
+      // Deduplicate by email
+      const uniqueContacts = deduplicateContacts(validContacts)
+      console.log(`Total contacts: ${contacts.length}, Valid: ${validContacts.length}, Unique: ${uniqueContacts.length}`)
+
+      // Log results
+      await createLogEntry(
+        supabase,
+        userId,
+        'info',
+        `Audience "${audience.name}" completed: ${uniqueContacts.length} unique contacts found`,
+        {
+          audienceId: audience.id,
+          totalContacts: contacts.length,
+          validContacts: validContacts.length,
+          uniqueContacts: uniqueContacts.length,
+        }
+      )
+
+      if (uniqueContacts.length > 0) {
         // Check if a shared audience already exists for this source
         const { data: existingShared } = await supabase
           .from('shared_audiences')
@@ -267,7 +545,7 @@ async function processAudiences(
           const { data: updatedShared } = await supabase
             .from('shared_audiences')
             .update({
-              contacts: validContacts,
+              contacts: uniqueContacts,
               selected: false,
               uploaded_to_meta: false,
               updated_at: new Date().toISOString(),
@@ -286,7 +564,7 @@ async function processAudiences(
               source_audience_id: audience.id,
               source_audience_type: audience.type,
               name: audience.name,
-              contacts: validContacts,
+              contacts: uniqueContacts,
               selected: false,
               uploaded_to_meta: false,
             })
@@ -299,7 +577,7 @@ async function processAudiences(
         results.push({
           audienceId: audience.id,
           audienceName: audience.name,
-          contactsFound: validContacts.length,
+          contactsFound: uniqueContacts.length,
           sharedAudienceId: sharedAudienceId,
         })
 
@@ -314,6 +592,14 @@ async function processAudiences(
           .update({ status: 'completed' })
           .eq('id', audience.id)
 
+        await createLogEntry(
+          supabase,
+          userId,
+          'warn',
+          `Audience "${audience.name}" completed but no contacts found`,
+          { audienceId: audience.id }
+        )
+
         results.push({
           audienceId: audience.id,
           audienceName: audience.name,
@@ -322,6 +608,14 @@ async function processAudiences(
       }
     } catch (error: any) {
       console.error(`Error processing audience ${audience.id}:`, error)
+
+      await createLogEntry(
+        supabase,
+        userId,
+        'error',
+        `Failed to process audience: ${audience.name}`,
+        { audienceId: audience.id, error: error.message || 'Unknown error' }
+      )
 
       await supabase
         .from('source_audiences')
@@ -340,25 +634,24 @@ async function processAudiences(
     }
   }
 
+  // Log completion
+  await createLogEntry(
+    supabase,
+    userId,
+    'info',
+    `Search completed: ${results.length} audience(s) processed`,
+    { results }
+  )
+
   return results
 }
 
-function generateDemoContacts(urlCount: number) {
-  const contacts = []
-  const countPerUrl = 3
-
-  for (let i = 0; i < urlCount * countPerUrl; i++) {
-    const id = i + 1
-    contacts.push({
-      firstName: `FirstName${id}`,
-      lastName: `LastName${id}`,
-      email: `contact${id}@example.com`,
-      phone: `+12345678${id.toString().padStart(2, '0')}`,
-      city: 'Milan',
-      country: 'Italy',
-      interests: ['technology', 'business', 'marketing'].slice(0, Math.floor(Math.random() * 3) + 1),
-    })
-  }
-
-  return contacts
+function deduplicateContacts(contacts: Contact[]): Contact[] {
+  const seen = new Set<string>()
+  return contacts.filter((contact) => {
+    const key = contact.email.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }

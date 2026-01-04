@@ -425,16 +425,71 @@ export function SourceAudienceList() {
     if (isDemoMode) {
       setIsSearching(true)
 
+      const startTime = new Date().toISOString()
+      const timeline: Array<{ timestamp: string; event: string; details?: any }> = []
+      const selectedAudiences = audiences.filter((a) => a.selected)
+
+      // Create request payload
+      const requestPayload = {
+        sourceAudienceIds: selectedIds,
+        mode: 'demo',
+        timestamp: startTime
+      }
+
+      timeline.push({
+        timestamp: startTime,
+        event: 'SEARCH_STARTED',
+        details: {
+          audiencesCount: selectedIds.length,
+          totalUrls: selectedAudiences.reduce((sum, a) => sum + a.urls.length, 0)
+        }
+      })
+
       // Simulate processing delay
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
       // Create demo shared audiences for each selected source audience
       const { addDemoSharedAudience, updateDemoSharedAudience, demoSharedAudiences } = useDemoStore.getState()
-      const selectedAudiences = audiences.filter((a) => a.selected)
 
       for (const sourceAudience of selectedAudiences) {
+        const processingTime = new Date().toISOString()
+
+        // Simulate API request/response for this audience
+        const apiRequest = {
+          endpoint: '/api/source-audiences/search',
+          method: 'POST',
+          body: {
+            sourceAudienceId: sourceAudience.id,
+            urls: sourceAudience.urls
+          }
+        }
+
         const contactsPerUrl = 3
         const contactCount = sourceAudience.urls.length * contactsPerUrl
+
+        // Simulate API response
+        const apiResponse = {
+          status: 200,
+          body: {
+            sourceAudienceId: sourceAudience.id,
+            status: 'completed',
+            contactsFound: contactCount,
+            urlsProcessed: sourceAudience.urls.length,
+            processingTimeMs: Math.floor(Math.random() * 2000) + 500
+          }
+        }
+
+        timeline.push({
+          timestamp: processingTime,
+          event: 'AUDIENCE_PROCESSING',
+          details: {
+            audienceName: sourceAudience.name,
+            audienceId: sourceAudience.id,
+            urlCount: sourceAudience.urls.length,
+            request: apiRequest,
+            response: apiResponse
+          }
+        })
 
         const demoContacts = Array.from({ length: contactCount }, (_, i) => ({
           firstName: `FirstName${i + 1}`,
@@ -471,13 +526,67 @@ export function SourceAudienceList() {
             updatedAt: new Date(),
           }
 
-          console.log('Creating new demo shared audience with selected=true:', sharedAudience.name, sharedAudience.id)
           addDemoSharedAudience(sharedAudience)
-          console.log('Shared audience added to store')
         }
+
+        timeline.push({
+          timestamp: new Date().toISOString(),
+          event: 'CONTACTS_EXTRACTED',
+          details: {
+            audienceName: sourceAudience.name,
+            contactsCount: contactCount
+          }
+        })
       }
 
       const totalContacts = selectedAudiences.reduce((sum, a) => sum + (a.urls.length * 3), 0)
+      const endTime = new Date().toISOString()
+
+      const responsePayload = {
+        status: 'completed',
+        results: selectedAudiences.map(a => ({
+          sourceAudienceId: a.id,
+          sourceAudienceName: a.name,
+          contactsFound: a.urls.length * 3,
+          urlsProcessed: a.urls.length
+        })),
+        totalContacts,
+        startTime,
+        endTime
+      }
+
+      timeline.push({
+        timestamp: endTime,
+        event: 'SEARCH_COMPLETED',
+        details: {
+          totalContacts,
+          durationMs: new Date(endTime).getTime() - new Date(startTime).getTime(),
+          response: responsePayload
+        }
+      })
+
+      // Create single log with full timeline
+      try {
+        const logEntry = {
+          id: crypto.randomUUID(),
+          level: 'info' as const,
+          message: `Search completed: ${totalContacts} contacts from ${selectedAudiences.length} audience(s)`,
+          created_at: new Date().toISOString(),
+          metadata: {
+            operation: 'SEARCH',
+            mode: 'demo',
+            timeline,
+            request: requestPayload,
+            response: responsePayload
+          }
+        }
+
+        // In demo mode, save to store instead of API
+        const { setDemoLogs, demoLogs } = useDemoStore.getState()
+        setDemoLogs([...demoLogs, logEntry])
+      } catch (error) {
+        console.error('Failed to create demo log:', error)
+      }
 
       showConfirmation('Search Complete', `Found ${totalContacts} contacts total.`, () => {
         // Deselect all source audiences after search
@@ -559,30 +668,6 @@ export function SourceAudienceList() {
           </div>
         ))}
       </div>
-      <Alert className={`${isDemoMode ? 'bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800' : 'bg-gray-50 dark:bg-gray-950 border-gray-200 dark:border-gray-800'}`}>
-        <Sparkles className={`h-4 w-4 ${isDemoMode ? 'text-purple-600' : 'text-gray-600'}`} />
-        <AlertDescription className="flex items-center justify-between">
-          <div>
-            <span className="font-semibold">
-              {isDemoMode ? 'Demo Mode Active' : 'Demo Mode Off'}
-            </span>
-            <span className="text-sm ml-2 text-muted-foreground">
-              {isDemoMode
-                ? 'Using simulated data - no database changes'
-                : 'Using real database - all changes will be saved'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={isDemoMode}
-              onCheckedChange={handleToggleDemoMode}
-            />
-            <span className="text-sm text-muted-foreground">
-              {isDemoMode ? 'ON' : 'OFF'}
-            </span>
-          </div>
-        </AlertDescription>
-      </Alert>
 
       {/* Header with Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

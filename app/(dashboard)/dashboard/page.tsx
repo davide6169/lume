@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSupabase } from '@/components/providers/supabase-provider'
+import { useDemoStore } from '@/lib/stores/useDemoStore'
 import { Card } from '@/components/ui/card'
 import { Users, UserPlus, Database, Upload, DollarSign, TrendingUp } from 'lucide-react'
 
@@ -15,23 +16,64 @@ interface DashboardStats {
   recentActivity: { date: string; operations: number }[]
 }
 
+const CACHE_KEY = 'dashboard_stats_cache'
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
 export default function DashboardPage() {
   const { profile } = useSupabase()
+  const { isDemoMode } = useDemoStore()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadStats()
-    // Refresh stats every 30 seconds
-    const interval = setInterval(loadStats, 30000)
-    return () => clearInterval(interval)
-  }, [])
+  }, [isDemoMode]) // Reload when demo mode changes
 
   const loadStats = async () => {
+    setLoading(true)
     try {
-      const response = await fetch('/api/dashboard')
+      // Read FRESH isDemoMode value from store to avoid stale closure values
+      const currentIsDemoMode = useDemoStore.getState().isDemoMode
+
+      // In demo mode, calculate stats from store
+      if (currentIsDemoMode) {
+        console.log('Dashboard: Loading DEMO stats (isDemoMode =', currentIsDemoMode, ')')
+        const { demoSourceAudiences, demoSharedAudiences } = useDemoStore.getState()
+        const totalSourceAudiences = demoSourceAudiences.length
+        const totalUrls = demoSourceAudiences.reduce((sum, sa) => sum + (sa.urls?.length || 0), 0)
+        const totalContacts = demoSharedAudiences.reduce((sum, sa) => sum + (sa.contacts?.length || 0), 0)
+        const uploadedContacts = demoSharedAudiences.filter((sa) => sa.uploaded_to_meta).length
+
+        const demoStats: DashboardStats = {
+          totalSourceAudiences,
+          totalUrls,
+          totalContacts,
+          uploadedContacts,
+          totalCost: 0,
+          costBreakdown: [],
+          recentActivity: Array.from({ length: 7 }, (_, i) => {
+            const date = new Date()
+            date.setDate(date.getDate() - (6 - i))
+            const dateStr = date.toISOString().split('T')[0]
+            return {
+              date: dateStr,
+              operations: 0,
+            }
+          }),
+        }
+
+        console.log('Dashboard: DEMO stats', demoStats)
+        setStats(demoStats)
+        setLoading(false)
+        return
+      }
+
+      // In production mode, ALWAYS fetch fresh data (no cache)
+      console.log('Dashboard: Loading PRODUCTION stats from API (isDemoMode =', currentIsDemoMode, ')')
+      const response = await fetch('/api/dashboard?demoMode=false')
       if (response.ok) {
         const data = await response.json()
+        console.log('Dashboard: PRODUCTION stats received', data)
         setStats(data)
       }
     } catch (error) {

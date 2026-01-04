@@ -183,6 +183,7 @@ export interface ExportableSettings {
     hunter?: string;
   };
   demoMode?: boolean;
+  logsEnabled?: boolean;
   selectedLlmModel?: string;
   selectedEmbeddingModel?: string;
 }
@@ -323,3 +324,72 @@ export interface HunterEmailResponse {
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
 export type Nullable<T> = T | null;
 export type Optional<T> = T | undefined;
+
+// ============================================
+// Meta GraphAPI Types
+// ============================================
+
+export interface ParsedMetaUrl {
+  platform: 'facebook' | 'instagram';
+  type: 'page' | 'group' | 'post' | 'profile' | 'media';
+  id: string;
+  username?: string;
+}
+
+export interface FacebookPost {
+  id: string;
+  message?: string;
+  created_time: string;
+  permalink_url?: string;
+}
+
+export interface FacebookComment {
+  id: string;
+  from: {
+    id: string;
+    name: string;
+  };
+  message: string;
+  created_time: string;
+}
+
+export interface InstagramMedia {
+  id: string;
+  caption?: string;
+  media_type: string;
+  permalink: string;
+  timestamp: string;
+}
+
+export interface InstagramComment {
+  id: string;
+  from: {
+    id: string;
+    username: string;
+  };
+  text: string;
+  timestamp: string;
+}
+
+export interface FetchOptions {
+  limit?: number;
+  after?: string;
+  fields?: string[];
+}
+
+export enum MetaErrorType {
+  AUTH_ERROR = 'AUTH_ERROR',
+  RATE_LIMIT = 'RATE_LIMIT',
+  PERMISSION_DENIED = 'PERMISSION_DENIED',
+  RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND',
+  PRIVATE_CONTENT = 'PRIVATE_CONTENT',
+  UNKNOWN = 'UNKNOWN'
+}
+
+export interface MetaGraphApiError {
+  type: MetaErrorType;
+  message: string;
+  recoverable: boolean;
+  retryAfter?: number;
+  code?: number;
+}

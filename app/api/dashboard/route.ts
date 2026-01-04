@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ensureProfileExists } from '@/lib/supabase/queries'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createSupabaseServerClient()
 
@@ -18,6 +18,32 @@ export async function GET() {
     // Ensure profile exists
     await ensureProfileExists(user.id, user.email)
 
+    // Check demo mode from query parameter
+    const { searchParams } = new URL(request.url)
+    const demoMode = searchParams.get('demoMode') === 'true'
+
+    // Demo mode: return demo data
+    if (demoMode) {
+      return NextResponse.json({
+        totalSourceAudiences: 3,
+        totalUrls: 8,
+        totalContacts: 127,
+        uploadedContacts: 95,
+        totalCost: 0,
+        costBreakdown: [],
+        recentActivity: Array.from({ length: 7 }, (_, i) => {
+          const date = new Date()
+          date.setDate(date.getDate() - (6 - i))
+          const dateStr = date.toISOString().split('T')[0]
+          return {
+            date: dateStr,
+            operations: Math.floor(Math.random() * 5),
+          }
+        }),
+      })
+    }
+
+    // Production mode: read from database
     // Get all source audiences
     const { data: sourceAudiences, error: sourceError } = await supabase
       .from('source_audiences')
@@ -27,6 +53,13 @@ export async function GET() {
     const { data: sharedAudiences, error: sharedError } = await supabase
       .from('shared_audiences')
       .select('contacts, uploaded_to_meta')
+
+    // DEBUG: Log what we're getting from the database
+    console.log('Dashboard API - Production mode')
+    console.log('Source audiences count:', sourceAudiences?.length || 0)
+    console.log('Shared audiences count:', sharedAudiences?.length || 0)
+    console.log('Source audiences:', sourceAudiences)
+    console.log('Shared audiences:', sharedAudiences)
 
     // Calculate total URLs
     const totalUrls = sourceAudiences?.reduce((sum, sa) => sum + (sa.urls?.length || 0), 0) || 0

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { SourceAudience, SharedAudience } from '@/types'
+import type { LogEntry } from '@/types'
 
 interface DemoState {
   // Demo source audiences
@@ -21,6 +22,11 @@ interface DemoState {
   toggleDemoSharedAudienceSelection: (id: string) => void
   deselectAllDemoSharedAudiences: () => void
 
+  // Demo logs
+  demoLogs: LogEntry[]
+  setDemoLogs: (logs: LogEntry[]) => void
+  clearDemoLogs: () => void
+
   // Demo mode management
   isDemoMode: boolean
   setIsDemoMode: (enabled: boolean) => void
@@ -33,6 +39,7 @@ export const useDemoStore = create<DemoState>()(
       // Initial demo data
       demoSourceAudiences: [],
       demoSharedAudiences: [],
+      demoLogs: [],
       isDemoMode: true,
 
       addDemoSourceAudience: (audience) =>
@@ -103,7 +110,27 @@ export const useDemoStore = create<DemoState>()(
           })),
         })),
 
-      setIsDemoMode: (enabled) => set({ isDemoMode: enabled }),
+      setDemoLogs: (logs) => set({ demoLogs: logs }),
+
+      clearDemoLogs: () => set({ demoLogs: [] }),
+
+      setIsDemoMode: (enabled) => {
+        set({ isDemoMode: enabled })
+        // When enabling demo mode, reset demo data
+        if (enabled) {
+          set((state) => ({
+            // Select all demo source audiences by default
+            demoSourceAudiences: state.demoSourceAudiences.map((aud) => ({
+              ...aud,
+              selected: true,
+            })),
+            // Clear demo shared audiences
+            demoSharedAudiences: [],
+            // Clear demo logs
+            demoLogs: [],
+          }))
+        }
+      },
 
       canToggleDemoMode: () => {
         // Demo mode can only be enabled if there are no real DB audiences
