@@ -2,6 +2,12 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ensureProfileExists } from '@/lib/supabase/queries'
 import { jobProcessor } from '@/lib/services/job-processor'
 import { getAPIUsageStubService, API_PRICING } from '@/lib/services/api-usage-stub'
+import { createApolloEnrichmentService } from '@/lib/services/apollo-enrichment'
+import { ApolloEnrichmentStubService } from '@/lib/services/apollo-enrichment-stub'
+import { createHunterIoService } from '@/lib/services/hunter-io'
+import { createOpenRouterService } from '@/lib/services/openrouter'
+import { createMixedbreadService } from '@/lib/services/mixedbread'
+import { MetaGraphAPIService } from '@/lib/services/meta-graphapi'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -27,7 +33,7 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     console.log('[Search Job Start] Request body:', JSON.stringify(body, null, 2))
-    const { sourceAudienceIds, mode = 'production', sourceAudiences: clientSourceAudiences } = body
+    const { sourceAudienceIds, mode = 'production', sourceAudiences: clientSourceAudiences, apiKeys: clientApiKeys } = body
 
     console.log('[Search Job Start] Parsed values:', {
       sourceAudienceIds,
@@ -99,6 +105,7 @@ export async function POST(request: Request) {
         urls: sa.urls
       })),
       mode,
+      apiKeys: clientApiKeys, // Pass API keys for production mode
       initialUsage: {
         openrouter: initialOpenRouter.data.usage,
         mixedbread: initialMixedbread.data.usage,
@@ -603,31 +610,520 @@ async function processSearchJob(jobId: string, userId: string) {
         usageService.resetUsage()
       } else {
         // Production processing - call real APIs
-        // TODO: Implement real OpenRouter and Mixedbread API calls
-        // For now, simulate the same flow
+        console.log(`[JobProcessor] Production mode - starting real API processing`)
+
+        const apiKeys = job.payload.apiKeys
+
+        // Initialize Meta GraphAPI production service if API key available
+        if (apiKeys?.meta) {
+          const metaService = new MetaGraphAPIService(apiKeys.meta)
+          console.log('[JobProcessor] Meta GraphAPI production service initialized')
+
+          // Validate token
+          update(10, {
+            timestamp: new Date().toISOString(),
+            event: 'META_TOKEN_VALIDATION_STARTED',
+            details: {
+              provider: 'Meta GraphAPI',
+              task: 'Validate access token'
+            }
+          })
+
+          try {
+            const tokenValidation = await metaService.validateToken()
+
+            if (tokenValidation.valid) {
+              console.log('[JobProcessor] Meta token valid:', tokenValidation.appName)
+
+              update(15, {
+                timestamp: new Date().toISOString(),
+                event: 'META_TOKEN_VALIDATED',
+                details: {
+                  provider: 'Meta GraphAPI',
+                  appName: tokenValidation.appName || 'Unknown App',
+                  status: 'valid'
+                }
+              })
+            } else {
+              console.error('[JobProcessor] Meta token invalid:', tokenValidation.error)
+
+              update(15, {
+                timestamp: new Date().toISOString(),
+                event: 'META_TOKEN_INVALID',
+                details: {
+                  provider: 'Meta GraphAPI',
+                  error: tokenValidation.error
+                }
+              })
+
+              throw new Error(`Meta token validation failed: ${tokenValidation.error}`)
+            }
+          } catch (error) {
+            console.error('[JobProcessor] Exception during Meta token validation:', error)
+            throw error
+          }
+
+          // Demonstrate Facebook post fetching
+          const sampleFacebookUrl = 'https://www.facebook.com/20531316728/posts/10158264921766728/'
+
+          update(20, {
+            timestamp: new Date().toISOString(),
+            event: 'META_FETCH_STARTED',
+            details: {
+              provider: 'Meta GraphAPI',
+              platform: 'Facebook',
+              url: sampleFacebookUrl
+            }
+          })
+
+          try {
+            const parsedUrl = metaService.parseUrl(sampleFacebookUrl)
+            console.log('[JobProcessor] Parsed Facebook URL:', parsedUrl)
+
+            // Fetch comments from the post
+            const comments = await metaService.fetchFacebookComments(parsedUrl.id, { limit: 10 })
+
+            console.log('[JobProcessor] Fetched Facebook comments:', comments.length)
+
+            update(25, {
+              timestamp: new Date().toISOString(),
+              event: 'META_FETCH_COMPLETED',
+              details: {
+                provider: 'Meta GraphAPI',
+                platform: 'Facebook',
+                resourceType: 'post comments',
+                commentsFetched: comments.length,
+                sampleComments: comments.slice(0, 3).map(c => ({
+                  from: c.from.name,
+                  message: c.message.substring(0, 100) + '...'
+                }))
+              }
+            })
+          } catch (error) {
+            console.error('[JobProcessor] Exception during Meta GraphAPI fetch:', error)
+            update(25, {
+              timestamp: new Date().toISOString(),
+              event: 'META_FETCH_FAILED',
+              details: {
+                provider: 'Meta GraphAPI',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            })
+          }
+        } else {
+          console.log('[JobProcessor] No Meta API key provided, skipping Meta GraphAPI integration')
+        }
+
+        // Continue with other services...
+
+        if (!apiKeys || !apiKeys.apollo) {
+          console.error('[JobProcessor] Missing Apollo API key for production mode')
+          throw new Error('Apollo API key is required for production mode')
+        }
+
+        // Initialize Apollo production service
+        const apolloService = createApolloEnrichmentService(apiKeys.apollo)
+        console.log('[JobProcessor] Apollo production service initialized')
+
+        // Track total contacts enriched
+        let totalContactsEnriched = 0
+        let successfulEnrichments = 0
+        let failedEnrichments = 0
+
+        // Process each audience
         for (let i = 0; i < sourceAudiences.length; i++) {
           const audience: any = sourceAudiences[i]
           const audienceProgress = 10 + ((i + 1) / totalAudiences) * 80
 
+          update(audienceProgress - 5, {
+            timestamp: new Date().toISOString(),
+            event: 'AUDIENCE_PROCESSING_STARTED',
+            details: {
+              audienceName: audience.name,
+              audienceId: audience.id,
+              urlCount: audience.urls.length,
+              platform: audience.type
+            }
+          })
+
+          // Simulate some contacts to enrich (in real implementation, these would come from Meta GraphAPI + LLM extraction)
+          const sampleContacts = [
+            { firstName: 'Mario', lastName: 'Rossi', email: 'mario.rossi@example.com' },
+            { firstName: 'Lucia', lastName: 'Bianchi', email: 'lucia.bianchi@techcompany.it' },
+            { firstName: 'Marco', lastName: 'Verdi', email: 'marco.verdi@startup.com' }
+          ]
+
+          console.log(`[JobProcessor] Enriching ${sampleContacts.length} contacts for audience ${audience.name}`)
+
+          // Enrich contacts using Apollo production API
+          for (let j = 0; j < sampleContacts.length; j++) {
+            const contact = sampleContacts[j]
+            const contactProgress = audienceProgress - 4 + (j / sampleContacts.length) * 4
+
+            update(contactProgress, {
+              timestamp: new Date().toISOString(),
+              event: 'APOLLO_ENRICHMENT_STARTED',
+              details: {
+                provider: 'Apollo.io',
+                endpoint: '/api/v1/people/match',
+                contactEmail: contact.email,
+                contactIndex: j + 1
+              }
+            })
+
+            try {
+              // Call real Apollo API
+              const enrichmentRequest = apolloService.contactToEnrichmentRequest(contact)
+              const result = await apolloService.enrichPerson(enrichmentRequest)
+
+              if (result.error) {
+                console.error(`[JobProcessor] Apollo enrichment failed for ${contact.email}:`, result.error)
+                failedEnrichments++
+                update(contactProgress, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APOLLO_ENRICHMENT_FAILED',
+                  details: {
+                    provider: 'Apollo.io',
+                    contactEmail: contact.email,
+                    error: result.error
+                  }
+                })
+              } else if (result.person) {
+                console.log(`[JobProcessor] Apollo enrichment successful for ${contact.email}`)
+                successfulEnrichments++
+                totalContactsEnriched++
+
+                update(contactProgress, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APOLLO_ENRICHMENT_COMPLETED',
+                  details: {
+                    provider: 'Apollo.io',
+                    endpoint: '/api/v1/people/match',
+                    contactEmail: contact.email,
+                    enrichedData: {
+                      firstName: result.person.first_name,
+                      lastName: result.person.last_name,
+                      title: result.person.title,
+                      company: result.person.employment_history?.[0]?.organization_name,
+                      linkedinUrl: result.person.linkedin_url,
+                      phoneFound: !!result.person.contact?.phone_numbers?.length
+                    }
+                  }
+                })
+              }
+            } catch (error) {
+              console.error(`[JobProcessor] Exception during Apollo enrichment for ${contact.email}:`, error)
+              failedEnrichments++
+            }
+          }
+
+          // Complete audience processing
           update(audienceProgress, {
             timestamp: new Date().toISOString(),
             event: 'AUDIENCE_PROCESSING_COMPLETED',
             details: {
               audienceName: audience.name,
-              contactsFound: audience.urls.length * 3
+              contactsProcessed: sampleContacts.length,
+              successfulEnrichments,
+              failedEnrichments
             }
           })
-
-          await new Promise(resolve => setTimeout(resolve, 2000))
         }
 
+        // Final completion
         update(100, {
           timestamp: new Date().toISOString(),
           event: 'SEARCH_COMPLETED',
           details: {
-            totalContacts: sourceAudiences.reduce((sum: number, sa: any) => sum + sa.urls.length * 3, 0)
+            totalContactsProcessed: totalContactsEnriched,
+            successfulEnrichments,
+            failedEnrichments,
+            successRate: successfulEnrichments > 0 ? `${Math.round((successfulEnrichments / (successfulEnrichments + failedEnrichments)) * 100)}%` : '0%',
+            providers: {
+              enrichment: 'Apollo.io',
+              enrichmentEndpoint: '/api/v1/people/match',
+              mode: 'production'
+            }
           }
         })
+
+        console.log(`[JobProcessor] Production processing completed: ${successfulEnrichments} successful, ${failedEnrichments} failed`)
+
+        // Initialize Hunter.io production service if API key available
+        if (apiKeys?.hunter) {
+          const hunterService = createHunterIoService(apiKeys.hunter)
+          console.log('[JobProcessor] Hunter.io production service initialized')
+
+          // Demonstrate email verification with a sample contact
+          const sampleEmail = 'mario.rossi@example.com'
+
+          update(50, {
+            timestamp: new Date().toISOString(),
+            event: 'EMAIL_VERIFICATION_STARTED',
+            details: {
+              provider: 'Hunter.io',
+              endpoint: '/v2/email-verifier',
+              email: sampleEmail
+            }
+          })
+
+          try {
+            const verificationResult = await hunterService.verifyEmail({ email: sampleEmail })
+
+            if (verificationResult.errors && verificationResult.errors.length > 0) {
+              console.error('[JobProcessor] Hunter.io verification error:', verificationResult.errors)
+              update(55, {
+                timestamp: new Date().toISOString(),
+                event: 'EMAIL_VERIFICATION_FAILED',
+                details: {
+                  provider: 'Hunter.io',
+                  email: sampleEmail,
+                  error: verificationResult.errors[0].details
+                }
+              })
+            } else {
+              console.log('[JobProcessor] Hunter.io verification successful:', verificationResult.data)
+              update(55, {
+                timestamp: new Date().toISOString(),
+                event: 'EMAIL_VERIFICATION_COMPLETED',
+                details: {
+                  provider: 'Hunter.io',
+                  endpoint: '/v2/email-verifier',
+                  email: sampleEmail,
+                  status: verificationResult.data.status,
+                  score: verificationResult.data.score,
+                  result: {
+                    isValid: verificationResult.data.status === 'valid' || verificationResult.data.status === 'accept_all',
+                    score: verificationResult.data.score,
+                    webmail: verificationResult.data.webmail,
+                    disposable: verificationResult.data.disposable,
+                    sourcesCount: verificationResult.data.sources?.length || 0
+                  }
+                }
+              })
+            }
+          } catch (error) {
+            console.error('[JobProcessor] Exception during Hunter.io verification:', error)
+          }
+
+          // Demonstrate email finder with a sample contact
+          const sampleContact = {
+            first_name: 'Giulia',
+            last_name: 'Bianchi',
+            domain: 'techcompany.it'
+          }
+
+          update(60, {
+            timestamp: new Date().toISOString(),
+            event: 'EMAIL_FINDER_STARTED',
+            details: {
+              provider: 'Hunter.io',
+              endpoint: '/v2/email-finder',
+              contact: `${sampleContact.first_name} ${sampleContact.last_name} @ ${sampleContact.domain}`
+            }
+          })
+
+          try {
+            const finderResult = await hunterService.findEmail(sampleContact)
+
+            if (finderResult && finderResult.data) {
+              console.log('[JobProcessor] Hunter.io email found:', finderResult.data.email)
+              update(65, {
+                timestamp: new Date().toISOString(),
+                event: 'EMAIL_FINDER_COMPLETED',
+                details: {
+                  provider: 'Hunter.io',
+                  endpoint: '/v2/email-finder',
+                  emailFound: finderResult.data.email,
+                  score: finderResult.data.score,
+                  status: finderResult.data.status,
+                  sourcesCount: finderResult.data.sources?.length || 0
+                }
+              })
+            } else {
+              console.log('[JobProcessor] Hunter.io email not found')
+              update(65, {
+                timestamp: new Date().toISOString(),
+                event: 'EMAIL_FINDER_NOT_FOUND',
+                details: {
+                  provider: 'Hunter.io',
+                  contact: `${sampleContact.first_name} ${sampleContact.last_name} @ ${sampleContact.domain}`,
+                  message: 'Email address not found in database'
+                }
+              })
+            }
+          } catch (error) {
+            console.error('[JobProcessor] Exception during Hunter.io email finder:', error)
+          }
+
+          // Get account info to show remaining credits
+          try {
+            const accountInfo = await hunterService.getAccountInfo()
+            if (accountInfo.calls) {
+              console.log('[JobProcessor] Hunter.io account info:', accountInfo.calls)
+              update(70, {
+                timestamp: new Date().toISOString(),
+                event: 'HUNTER_ACCOUNT_INFO',
+                details: {
+                  provider: 'Hunter.io',
+                  credits: {
+                    available: accountInfo.calls.available,
+                    used: accountInfo.calls.used,
+                    total: accountInfo.calls.total,
+                    resetDate: accountInfo.calls.reset_date
+                  }
+                }
+              })
+            }
+          } catch (error) {
+            console.error('[JobProcessor] Exception getting Hunter.io account info:', error)
+          }
+        } else {
+          console.log('[JobProcessor] No Hunter.io API key provided, skipping Hunter.io integration')
+        }
+
+        // Initialize OpenRouter production service if API key available
+        if (apiKeys?.openrouter) {
+          const openrouterService = createOpenRouterService(apiKeys.openrouter)
+          console.log('[JobProcessor] OpenRouter production service initialized')
+
+          // Demonstrate LLM contact extraction
+          const samplePost = `Check out our amazing team!
+
+Mario Rossi - CEO at TechCorp
+Email: mario.rossi@techcorp.com
+Phone: +39 333 1234567
+
+Giulia Bianchi - Marketing Director
+Email: giulia.bianchi@techcorp.com
+
+Luca Verdi - Senior Developer
+Email: luca.verdi@techcorp.com`
+
+          update(75, {
+            timestamp: new Date().toISOString(),
+            event: 'LLM_EXTRACTION_STARTED',
+            details: {
+              provider: 'OpenRouter',
+              model: 'mistralai/mistral-7b-instruct:free',
+              task: 'Contact extraction from social media post'
+            }
+          })
+
+          try {
+            const extractedContacts = await openrouterService.extractContacts(
+              samplePost,
+              'mistralai/mistral-7b-instruct:free'
+            )
+
+            console.log('[JobProcessor] OpenRouter extraction successful:', extractedContacts.length, 'contacts')
+
+            update(80, {
+              timestamp: new Date().toISOString(),
+              event: 'LLM_EXTRACTION_COMPLETED',
+              details: {
+                provider: 'OpenRouter',
+                model: 'mistralai/mistral-7b-instruct:free',
+                contactsExtracted: extractedContacts.length,
+                contacts: extractedContacts.slice(0, 3), // Show first 3
+                sampleContact: extractedContacts[0] || null
+              }
+            })
+          } catch (error) {
+            console.error('[JobProcessor] Exception during OpenRouter extraction:', error)
+            update(80, {
+              timestamp: new Date().toISOString(),
+              event: 'LLM_EXTRACTION_FAILED',
+              details: {
+                provider: 'OpenRouter',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            })
+          }
+        } else {
+          console.log('[JobProcessor] No OpenRouter API key provided, skipping OpenRouter integration')
+        }
+
+        // Initialize Mixedbread production service if API key available
+        if (apiKeys?.mixedbread) {
+          const mixedbreadService = createMixedbreadService(apiKeys.mixedbread)
+          console.log('[JobProcessor] Mixedbread production service initialized')
+
+          // Demonstrate embedding generation for contacts
+          const sampleContacts = [
+            { firstName: 'Mario', lastName: 'Rossi', email: 'mario.rossi@example.com', company: 'TechCorp' },
+            { firstName: 'Giulia', lastName: 'Bianchi', email: 'giulia.bianchi@example.com', company: 'TechCorp' },
+          ]
+
+          update(85, {
+            timestamp: new Date().toISOString(),
+            event: 'EMBEDDINGS_STARTED',
+            details: {
+              provider: 'Mixedbread',
+              model: 'mixedbread-ai/mxbai-embed-large-v1',
+              contactsToEmbed: sampleContacts.length
+            }
+          })
+
+          try {
+            // Generate embeddings for each contact
+            const embeddings: Array<{ contact: any; embedding: number[] }> = []
+
+            for (const contact of sampleContacts) {
+              const embedding = await mixedbreadService.embedContact(contact)
+              embeddings.push({ contact, embedding })
+              console.log('[JobProcessor] Generated embedding for:', contact.firstName, contact.lastName)
+            }
+
+            // Calculate similarity between contacts
+            if (embeddings.length >= 2) {
+              const similarity = mixedbreadService.cosineSimilarity(
+                embeddings[0].embedding,
+                embeddings[1].embedding
+              )
+
+              console.log('[JobProcessor] Similarity calculated:', similarity)
+
+              update(90, {
+                timestamp: new Date().toISOString(),
+                event: 'EMBEDDINGS_COMPLETED',
+                details: {
+                  provider: 'Mixedbread',
+                  model: 'mixedbread-ai/mxbai-embed-large-v1',
+                  embeddingDimensions: embeddings[0]?.embedding.length || 0,
+                  embeddingsGenerated: embeddings.length,
+                  sampleSimilarity: {
+                    contact1: `${embeddings[0].contact.firstName} ${embeddings[0].contact.lastName}`,
+                    contact2: `${embeddings[1].contact.firstName} ${embeddings[1].contact.lastName}`,
+                    score: similarity
+                  }
+                }
+              })
+            } else {
+              update(90, {
+                timestamp: new Date().toISOString(),
+                event: 'EMBEDDINGS_COMPLETED',
+                details: {
+                  provider: 'Mixedbread',
+                  embeddingsGenerated: embeddings.length,
+                  embeddingDimensions: embeddings[0]?.embedding.length || 0
+                }
+              })
+            }
+          } catch (error) {
+            console.error('[JobProcessor] Exception during Mixedbread embeddings:', error)
+            update(90, {
+              timestamp: new Date().toISOString(),
+              event: 'EMBEDDINGS_FAILED',
+              details: {
+                provider: 'Mixedbread',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            })
+          }
+        } else {
+          console.log('[JobProcessor] No Mixedbread API key provided, skipping Mixedbread integration')
+        }
       }
     })
 

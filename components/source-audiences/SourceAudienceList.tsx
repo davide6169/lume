@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSourceAudiencesStore } from '@/lib/stores/useSourceAudiencesStore'
 import { useSharedAudiencesStore } from '@/lib/stores/useSharedAudiencesStore'
 import { useDemoStore } from '@/lib/stores/useDemoStore'
+import { useSettingsStore } from '@/lib/stores/useSettingsStore'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import { SourceAudienceCard } from './SourceAudienceCard'
 import { CreateSourceAudienceDialog } from './CreateSourceAudienceDialog'
@@ -591,9 +592,24 @@ export function SourceAudienceList() {
       // Start async job (works in both demo and production mode)
       const selectedAudiences = audiences.filter((a) => a.selected)
 
+      // Get API keys from settings store (for production mode)
+      const { apiKeys } = useSettingsStore.getState()
+
       const requestBody: any = {
         sourceAudienceIds: selectedIds,
         mode: isDemoMode ? 'demo' : 'production'
+      }
+
+      // In production mode, pass API keys securely
+      if (!isDemoMode) {
+        requestBody.apiKeys = {
+          apollo: apiKeys.apollo,
+          hunter: apiKeys.hunter,
+          openrouter: apiKeys.openrouter,
+          mixedbread: apiKeys.mixedbread,
+          meta: apiKeys.meta
+        }
+        console.log('[Frontend] Production mode - sending API keys for services:', Object.keys(requestBody.apiKeys).filter(k => requestBody.apiKeys[k]))
       }
 
       // In demo mode, pass the audience data directly (they're in the store, not DB)

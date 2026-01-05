@@ -11,6 +11,7 @@ export interface ApiTestScenario {
   method: 'GET' | 'POST'
   headers?: Record<string, string>
   body?: any
+  queryParams?: Record<string, string>
   expectedOutcome: {
     success: boolean
     statusCodes?: number[]
@@ -106,23 +107,24 @@ export const apiTestDefinitions: ApiServiceTests = {
 
   apollo: [
     {
-      id: 'search-contacts',
-      name: 'Search Contacts',
-      description: 'Search for contacts with a simple query',
-      endpoint: 'https://api.apollo.io/v1/mixed_people/search',
+      id: 'enrich-person',
+      name: 'Enrich Person',
+      description: 'Enrich a single person\'s data using email address',
+      endpoint: 'https://api.apollo.io/api/v1/people/match',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: {
-        q_keywords: 'test',
-        page: 1,
-        per_page: 1,
+      queryParams: {
+        email: 'test@example.com',
+        reveal_personal_emails: 'true',
+        reveal_phone_number: 'true',
       },
+      body: {},
       expectedOutcome: {
-        success: true,
-        statusCodes: [200],
-        contains: ['people'],
+        success: false,
+        statusCodes: [200, 403],
+        notContains: ['API_INACCESSIBLE'],
       },
     },
   ],
@@ -131,13 +133,18 @@ export const apiTestDefinitions: ApiServiceTests = {
     {
       id: 'email-finder',
       name: 'Email Finder',
-      description: 'Find email address for a domain',
+      description: 'Find email address from name and domain',
       endpoint: 'https://api.hunter.io/v2/email-finder',
       method: 'GET',
+      queryParams: {
+        first_name: 'John',
+        last_name: 'Doe',
+        domain: 'google.com',
+      },
       expectedOutcome: {
         success: true,
-        statusCodes: [200],
-        contains: ['data', 'email'],
+        statusCodes: [200, 404], // 404 if email not found
+        contains: ['data'],
       },
     },
     {
@@ -146,6 +153,9 @@ export const apiTestDefinitions: ApiServiceTests = {
       description: 'Verify if an email address is valid',
       endpoint: 'https://api.hunter.io/v2/email-verifier',
       method: 'GET',
+      queryParams: {
+        email: 'john.doe@google.com',
+      },
       expectedOutcome: {
         success: true,
         statusCodes: [200],

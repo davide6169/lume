@@ -226,6 +226,23 @@ export default function SettingsPage() {
                 <div key={service.key} className="space-y-2">
                   <Label htmlFor={service.key}>{service.name}</Label>
                   <p className="text-xs text-muted-foreground">{service.description}</p>
+                  {service.key === 'apollo' && (
+                    <Alert className="py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        <strong>Requires Paid Plan:</strong> Apollo.io People Enrichment API is only available on paid plans.
+                        Free API keys will return <code className="text-xs">API_INACCESSIBLE</code> errors.
+                        <a
+                          href="https://app.apollo.io/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 underline hover:text-primary"
+                        >
+                          Upgrade your plan →
+                        </a>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Input

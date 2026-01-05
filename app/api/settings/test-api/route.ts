@@ -94,10 +94,32 @@ export async function POST(request: Request) {
           method: scenario.method,
           headers: {
             ...scenario.headers,
-            Authorization: `Bearer ${apiKey}`,
           },
         }
 
+        // Add authentication headers based on service
+        if (serviceKey === 'apollo') {
+          // Apollo uses X-Api-Key header
+          options.headers = {
+            ...options.headers,
+            'X-Api-Key': apiKey,
+          }
+        } else {
+          // Other services use Authorization Bearer
+          options.headers = {
+            ...options.headers,
+            Authorization: `Bearer ${apiKey}`,
+          }
+        }
+
+        // Add query parameters from scenario
+        if (scenario.queryParams) {
+          Object.entries(scenario.queryParams).forEach(([key, value]) => {
+            url.searchParams.set(key, value)
+          })
+        }
+
+        // Add body if present
         if (scenario.body) {
           options.body = JSON.stringify(scenario.body)
         }
@@ -153,6 +175,18 @@ export async function POST(request: Request) {
 
         const outcome = statusMatch && containsMatch && notContainsMatch ? 'PASS' : 'FAIL'
 
+        // Special handling for Apollo API_INACCESSIBLE error
+        let details = outcome === 'PASS'
+          ? 'All validation checks passed'
+          : `Validation failed: ${!statusMatch ? `Status ${statusCode} not in expected range` : ''}${
+              !containsMatch ? ' - Missing expected content' : ''
+            }${!notContainsMatch ? ' - Found unexpected content' : ''}`
+
+        // Check for Apollo API_INACCESSIBLE error
+        if (serviceKey === 'apollo' && responseData?.error_code === 'API_INACCESSIBLE') {
+          details = '⚠️ Apollo.io People Enrichment API requires a paid plan. Free plans cannot access this endpoint. Please upgrade your plan at https://app.apollo.io/ to use Apollo enrichment features.'
+        }
+
         testResult = {
           success: outcome === 'PASS',
           simulated: false,
@@ -173,11 +207,7 @@ export async function POST(request: Request) {
             responseTime,
           },
           outcome,
-          details: outcome === 'PASS'
-            ? 'All validation checks passed'
-            : `Validation failed: ${!statusMatch ? `Status ${statusCode} not in expected range` : ''}${
-                !containsMatch ? ' - Missing expected content' : ''
-              }${!notContainsMatch ? ' - Found unexpected content' : ''}`,
+          details,
         }
 
         console.log(`[API Test] Request ${requestId} completed:`, testResult)
