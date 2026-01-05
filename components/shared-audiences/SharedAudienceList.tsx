@@ -67,6 +67,15 @@ export function SharedAudienceList() {
   const [exportDialog, setExportDialog] = useState(false)
   const [exportFileName, setExportFileName] = useState(`shared-audiences-${new Date().toISOString().split('T')[0]}.csv`)
 
+  // Toast notification helper
+  const addToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
+    const id = crypto.randomUUID()
+    setToasts(prev => [...prev, { id, title, description, variant }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 3000)
+  }
+
   // Use demo or real audiences based on mode
   const audiences = isDemoMode ? demoSharedAudiences : sharedAudiences
 
@@ -147,14 +156,6 @@ export function SharedAudienceList() {
     }
     // If switching to demo mode, shared audiences are cleared by SourceAudienceList
   }, [isDemoMode])
-
-  const addToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
-    const id = crypto.randomUUID()
-    setToasts(prev => [...prev, { id, title, description, variant }])
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-    }, 3000)
-  }
 
   const loadSharedAudiences = async () => {
     try {
@@ -291,16 +292,146 @@ export function SharedAudienceList() {
       return
     }
 
-    // In demo mode, simulate upload
+    // In demo mode, simulate upload with detailed logs
     if (isDemoMode) {
       setIsUploading(true)
-      await new Promise(resolve => setTimeout(resolve, 2000))
+
+      const startTime = new Date().toISOString()
+      const selectedAudiences = audiences.filter((a) => a.selected)
+      const totalContacts = selectedContactsCount
+      const timeline: Array<{
+        timestamp: string
+        event: string
+        details?: Record<string, any>
+      }> = []
+
+      // Step 1: Validation
+      await new Promise(resolve => setTimeout(resolve, 400))
+      timeline.push({
+        timestamp: new Date().toISOString(),
+        event: 'Validation completed',
+        details: {
+          validAudiences: selectedIds.length,
+          totalContacts: totalContacts,
+          validationRules: ['email_required', 'phone_optional', 'consent_checked']
+        }
+      })
+
+      // Step 2: API Request
+      await new Promise(resolve => setTimeout(resolve, 600))
+
+      // Create request payload
+      const requestPayload = {
+        sharedAudienceIds: selectedIds,
+        mode: 'demo',
+        uploadOptions: {
+          normalizePhones: true,
+          skipDuplicates: false,
+          updateExisting: false
+        },
+        timestamp: startTime
+      }
+
+      timeline.push({
+        timestamp: new Date().toISOString(),
+        event: 'Meta API request initiated',
+        details: {
+          endpoint: '/api/upload-meta',
+          method: 'POST',
+          body: {
+            sharedAudienceIds: selectedIds,
+            audiences: selectedAudiences.map((aud: any) => ({
+              id: aud.id,
+              name: aud.name,
+              contactsCount: aud.contacts?.length || 0
+            })),
+            totalContacts: totalContacts
+          }
+        }
+      })
+
+      // Step 3: Processing
+      await new Promise(resolve => setTimeout(resolve, 600))
+
+      const processingResults = selectedIds.map((id) => ({
+        audienceId: id,
+        audienceName: selectedAudiences.find((a: any) => a.id === id)?.name || 'Unknown',
+        uploadedContacts: Math.floor(Math.random() * 20) + 10,
+        status: 'success',
+        metaCustomAudienceId: `ca_${crypto.randomUUID().slice(0, 8)}`,
+        warnings: []
+      }))
+
+      timeline.push({
+        timestamp: new Date().toISOString(),
+        event: 'Processing contacts for Meta Custom Audiences',
+        details: {
+          audiencesProcessed: processingResults.length,
+          processingTimeMs: Math.floor(Math.random() * 800) + 200,
+          results: processingResults
+        }
+      })
+
+      // Step 4: API Response
+      await new Promise(resolve => setTimeout(resolve, 400))
+
+      const responsePayload = {
+        success: true,
+        message: 'Upload completed successfully',
+        results: processingResults,
+        summary: {
+          totalAudiences: selectedIds.length,
+          totalContacts: totalContacts,
+          successfullyUploaded: totalContacts,
+          failedContacts: 0,
+          processingTimeMs: Math.floor(Math.random() * 2000) + 1000
+        }
+      }
+
+      timeline.push({
+        timestamp: new Date().toISOString(),
+        event: 'Meta API response received',
+        details: {
+          status: 200,
+          body: responsePayload
+        }
+      })
+
+      // Update demo shared audiences with uploadedToMeta = true
+      const { updateDemoSharedAudience } = useDemoStore.getState()
+      selectedIds.forEach(id => {
+        updateDemoSharedAudience(id, { uploadedToMeta: true })
+      })
+
+      // Create log entry
+      try {
+        const logEntry = {
+          id: crypto.randomUUID(),
+          userId: '', // Demo mode - no user
+          level: 'info' as const,
+          message: `Upload completed: ${selectedIds.length} audience(s) with ${totalContacts} contacts uploaded to Meta`,
+          createdAt: new Date(),
+          metadata: {
+            operation: 'UPLOAD_TO_META',
+            mode: 'demo',
+            timeline,
+            request: requestPayload,
+            response: responsePayload
+          }
+        }
+
+        // Save to demo logs store (add to BEGINNING of array)
+        const { setDemoLogs, demoLogs } = useDemoStore.getState()
+        setDemoLogs([logEntry, ...demoLogs])
+      } catch (error) {
+        console.error('Failed to create demo log:', error)
+      }
 
       // Deselect all shared audiences after upload
       deselectAllDemoSharedAudiences()
 
       setIsUploading(false)
-      showConfirmation('Upload Complete', `Successfully uploaded ${selectedIds.length} audience(s) with ${selectedContactsCount} contacts to Meta (demo).`, () => {
+      showConfirmation('Upload Complete', `Successfully uploaded ${selectedIds.length} audience(s) with ${totalContacts} contacts to Meta (demo).`, () => {
         // Do nothing - just confirmation
       })
       return

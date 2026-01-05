@@ -37,6 +37,10 @@ interface SettingsState {
 
   // Reset
   resetSettings: () => void
+
+  // Sync with database
+  syncToDatabase: () => Promise<void>
+  loadFromDatabase: () => Promise<void>
 }
 
 const defaultSettings = {
@@ -101,6 +105,46 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       resetSettings: () => set(defaultSettings),
+
+      syncToDatabase: async () => {
+        const { demoMode, logsEnabled } = get()
+        try {
+          const response = await fetch('/api/settings/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ demoMode, logsEnabled }),
+          })
+
+          if (!response.ok) {
+            console.error('[Settings] Failed to sync to database')
+          }
+        } catch (error) {
+          console.error('[Settings] Error syncing to database:', error)
+        }
+      },
+
+      loadFromDatabase: async () => {
+        try {
+          const response = await fetch('/api/settings/save', {
+            method: 'GET',
+            credentials: 'include',
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            set({
+              demoMode: data.demoMode,
+              logsEnabled: data.logsEnabled,
+            })
+          } else if (response.status === 404) {
+            // Settings don't exist in DB yet, keep localStorage values
+            console.log('[Settings] No settings in database, using localStorage values')
+          }
+        } catch (error) {
+          console.error('[Settings] Error loading from database:', error)
+        }
+      },
     }),
     {
       name: 'lume-settings',

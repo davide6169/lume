@@ -6,7 +6,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Trash2, RotateCw, Copy, Check } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Trash2, RotateCw, Copy, Check, Download } from 'lucide-react'
 import { Facebook as FacebookIcon } from '@/components/icons/facebook'
 import { Instagram as InstagramIcon } from '@/components/icons/instagram'
 
@@ -26,6 +28,7 @@ export function SourceAudienceCard({
 }: SourceAudienceCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [exportDialog, setExportDialog] = useState<{ open: boolean; fileName: string } | null>(null)
 
   const getIcon = () => {
     if (audience.type === 'facebook') {
@@ -69,7 +72,44 @@ export function SourceAudienceCard({
     }
   }
 
+  const handleExport = () => {
+    const now = new Date()
+    const timestamp = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14) // YYYYMMDDHHMMSS
+    const defaultFileName = `lume-source-${timestamp}.txt`
+    setExportDialog({ open: true, fileName: defaultFileName })
+  }
+
+  const confirmExport = () => {
+    if (!exportDialog) return
+
+    const content = formatSourceAsText()
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = exportDialog.fileName
+    a.click()
+    URL.revokeObjectURL(url)
+    setExportDialog(null)
+  }
+
+  const formatSourceAsText = () => {
+    const lines = [
+      `Source Audience: ${audience.name}`,
+      `Type: ${audience.type}`,
+      `Status: ${audience.status}`,
+      `Created: ${new Date(audience.createdAt).toISOString()}`,
+      '',
+      'URLs:',
+      ...audience.urls.map((url, index) => `${index + 1}. ${url}`),
+      '',
+      `Total URLs: ${audience.urls.length}`,
+    ]
+    return lines.join('\n')
+  }
+
   return (
+    <>
     <div className="group" style={{ perspective: '1000px' }}>
       <div
         className="relative"
@@ -130,14 +170,27 @@ export function SourceAudienceCard({
               </div>
             </div>
 
-            {/* Flip indicator */}
-            <button
-              onClick={handleClick}
-              className="mt-auto pt-4 flex items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
-            >
-              <RotateCw className="h-4 w-4 mr-2" />
-              <span>View URLs</span>
-            </button>
+            {/* Flip indicator and Export button */}
+            <div className="mt-auto pt-4 flex items-center justify-between w-full">
+              <button
+                onClick={handleClick}
+                className="flex items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <RotateCw className="h-4 w-4 mr-2" />
+                <span>View URLs</span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleExport()
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded flex items-center gap-1"
+                title="Export to TXT"
+              >
+                <Download className="h-4 w-4" />
+                <span className="text-xs">Export</span>
+              </button>
+            </div>
           </div>
         </Card>
 
@@ -210,5 +263,36 @@ export function SourceAudienceCard({
         </Card>
       </div>
     </div>
+
+    {/* Export Dialog */}
+    {exportDialog && (
+      <Dialog open={exportDialog.open} onOpenChange={() => setExportDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Source Audience to TXT</DialogTitle>
+            <DialogDescription>
+              Choose a filename for this source audience export. The file will be saved in plain text format.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={exportDialog.fileName}
+              onChange={(e) => setExportDialog({ ...exportDialog, fileName: e.target.value })}
+              placeholder="filename.txt"
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialog(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmExport}>
+              Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )}
+  </>
   )
 }

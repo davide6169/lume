@@ -2,16 +2,19 @@
 
 import { useState } from 'react'
 import { useSettingsStore } from '@/lib/stores/useSettingsStore'
+import { useDemoStore } from '@/lib/stores/useDemoStore'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText, Play, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { getTestScenarios } from '@/lib/services/api-test-definitions'
 
 const apiServices = [
   { key: 'meta' as const, name: 'Meta (Facebook/Instagram)', description: 'For accessing social media data' },
@@ -22,9 +25,8 @@ const apiServices = [
 ] as const
 
 export default function SettingsPage() {
+  const { isDemoMode } = useDemoStore()
   const {
-    demoMode,
-    setDemoMode,
     logsEnabled,
     setLogsEnabled,
     selectedLlmModel,
@@ -38,6 +40,21 @@ export default function SettingsPage() {
     importSettings,
   } = useSettingsStore()
 
+  // Wrapper functions to sync with database
+  const handleSetLogsEnabled = (enabled: boolean) => {
+    setLogsEnabled(enabled)
+    setSaveMessage('Logging ' + (enabled ? 'enabled' : 'disabled'))
+    setTimeout(() => setSaveMessage(''), 3000)
+
+    // Sync to database in background
+    fetch('/api/settings/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ demoMode: isDemoMode, logsEnabled: enabled }),
+    }).catch(err => console.error('Error syncing logs enabled:', err))
+  }
+
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [tempKeys, setTempKeys] = useState(apiKeys)
   const [importJson, setImportJson] = useState('')
@@ -45,12 +62,30 @@ export default function SettingsPage() {
   const [exportDialog, setExportDialog] = useState(false)
   const [exportFileName, setExportFileName] = useState(`lume-settings-${new Date().toISOString().split('T')[0]}.json`)
 
+  // API Test states
+  const [testDialog, setTestDialog] = useState<{
+    open: boolean
+    serviceKey: string
+    serviceName: string
+  } | null>(null)
+  const [selectedScenario, setSelectedScenario] = useState<string>('')
+  const [testRunning, setTestRunning] = useState(false)
+  const [testResult, setTestResult] = useState<any>(null)
+
+  // API Keys save confirmation dialog
+  const [saveConfirmDialog, setSaveConfirmDialog] = useState(false)
+  const [savedKeysCount, setSavedKeysCount] = useState(0)
+
   const handleSaveKeys = () => {
+    let count = 0
     Object.entries(tempKeys).forEach(([service, key]) => {
       if (key) {
         setApiKey(service as keyof typeof apiKeys, key)
+        count++
       }
     })
+    setSavedKeysCount(count)
+    setSaveConfirmDialog(true)
     setSaveMessage('Settings saved successfully!')
     setTimeout(() => setSaveMessage(''), 3000)
   }
@@ -89,6 +124,68 @@ export default function SettingsPage() {
     setShowKeys((prev) => ({ ...prev, [service]: !prev[service] }))
   }
 
+  const openTestDialog = (serviceKey: string, serviceName: string) => {
+    const scenarios = getTestScenarios(serviceKey)
+    if (scenarios.length === 0) {
+      setSaveMessage('No test scenarios available for this service')
+      setTimeout(() => setSaveMessage(''), 3000)
+      return
+    }
+
+    // Select first scenario by default
+    setSelectedScenario(scenarios[0].id)
+    setTestResult(null)
+    setTestDialog({ open: true, serviceKey, serviceName })
+  }
+
+  const runTest = async () => {
+    if (!testDialog || !selectedScenario) return
+
+    setTestRunning(true)
+    setTestResult(null)
+
+    // Use isDemoMode from useDemoStore (the same as toolbar)
+    const currentDemoMode = useDemoStore.getState().isDemoMode
+
+    console.log('[Frontend] Demo mode from useDemoStore:', currentDemoMode)
+    console.log('[Frontend] Test scenario:', testDialog.serviceKey, selectedScenario)
+
+    try {
+      const response = await fetch('/api/settings/test-api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          serviceKey: testDialog.serviceKey,
+          scenarioId: selectedScenario,
+          apiKey: tempKeys[testDialog.serviceKey as keyof typeof apiKeys] || apiKeys[testDialog.serviceKey as keyof typeof apiKeys],
+          isDemoMode: currentDemoMode,
+        }),
+      })
+
+      const data = await response.json()
+      setTestResult(data)
+
+      if (data.error) {
+        setSaveMessage(`Test failed: ${data.error}`)
+      } else {
+        setSaveMessage(`Test ${data.outcome}: ${data.details}`)
+      }
+      setTimeout(() => setSaveMessage(''), 5000)
+    } catch (error) {
+      console.error('Error running test:', error)
+      setTestResult({
+        success: false,
+        outcome: 'ERROR',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      })
+      setSaveMessage('Test failed: Network error')
+      setTimeout(() => setSaveMessage(''), 3000)
+    } finally {
+      setTestRunning(false)
+    }
+  }
+
   return (
     <div className="space-y-8 max-w-4xl">
       {/* Header */}
@@ -123,33 +220,45 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {apiServices.map((service) => (
-              <div key={service.key} className="space-y-2">
-                <Label htmlFor={service.key}>{service.name}</Label>
-                <p className="text-xs text-muted-foreground">{service.description}</p>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id={service.key}
-                      type={showKeys[service.key] ? 'text' : 'password'}
-                      placeholder={`Enter your ${service.name} API key`}
-                      value={tempKeys[service.key] || ''}
-                      onChange={(e) =>
-                        setTempKeys((prev) => ({ ...prev, [service.key]: e.target.value }))
-                      }
-                    />
+            {apiServices.map((service) => {
+              const scenarios = getTestScenarios(service.key)
+              return (
+                <div key={service.key} className="space-y-2">
+                  <Label htmlFor={service.key}>{service.name}</Label>
+                  <p className="text-xs text-muted-foreground">{service.description}</p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id={service.key}
+                        type={showKeys[service.key] ? 'text' : 'password'}
+                        placeholder={`Enter your ${service.name} API key`}
+                        value={tempKeys[service.key] || ''}
+                        onChange={(e) =>
+                          setTempKeys((prev) => ({ ...prev, [service.key]: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => toggleShowKey(service.key)}
+                    >
+                      {showKeys[service.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => openTestDialog(service.key, service.name)}
+                      title={`Test ${service.name} API`}
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => toggleShowKey(service.key)}
-                  >
-                    {showKeys[service.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
             <Button onClick={handleSaveKeys} className="w-full">
               <Save className="mr-2 h-4 w-4" />
@@ -169,25 +278,6 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {/* Demo Mode Switch */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="demo-mode">Demo Mode</Label>
-                <p className="text-xs text-muted-foreground">
-                  Use demo data instead of real API calls. Recommended for testing.
-                </p>
-              </div>
-              <Switch
-                id="demo-mode"
-                checked={demoMode}
-                onCheckedChange={(checked) => {
-                  setDemoMode(checked)
-                  setSaveMessage('Demo mode ' + (checked ? 'enabled' : 'disabled'))
-                  setTimeout(() => setSaveMessage(''), 3000)
-                }}
-              />
-            </div>
-
             {/* Logs Enabled Switch */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -199,11 +289,7 @@ export default function SettingsPage() {
               <Switch
                 id="logs-enabled"
                 checked={logsEnabled}
-                onCheckedChange={(checked) => {
-                  setLogsEnabled(checked)
-                  setSaveMessage('Logging ' + (checked ? 'enabled' : 'disabled'))
-                  setTimeout(() => setSaveMessage(''), 3000)
-                }}
+                onCheckedChange={handleSetLogsEnabled}
               />
             </div>
           </Card>
@@ -321,6 +407,158 @@ export default function SettingsPage() {
             </Button>
             <Button onClick={confirmExport}>
               Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* API Test Dialog */}
+      {testDialog && (
+        <Dialog open={testDialog.open} onOpenChange={(open) => setTestDialog(open ? testDialog : null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Test {testDialog.serviceName} API</DialogTitle>
+              <DialogDescription>
+                Run a test call to verify your API key is working correctly
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Scenario Selection */}
+              <div className="space-y-2">
+                <Label>Test Scenario</Label>
+                <Select value={selectedScenario} onValueChange={setSelectedScenario} disabled={testRunning}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a test scenario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getTestScenarios(testDialog.serviceKey).map((scenario) => (
+                      <SelectItem key={scenario.id} value={scenario.id}>
+                        {scenario.name} - {scenario.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Test Result */}
+              {testResult && (
+                <div className="space-y-3">
+                  {/* Status */}
+                  <div className={`flex items-center gap-2 p-3 rounded-lg border ${
+                    testResult.outcome === 'PASS'
+                      ? 'bg-green-50 dark:bg-green-950 border-green-500'
+                      : 'bg-red-50 dark:bg-red-950 border-red-500'
+                  }`}>
+                    {testResult.outcome === 'PASS' ? (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-600" />
+                    )}
+                    <div className="flex-1">
+                      <div className="font-semibold">
+                        Test {testResult.outcome}
+                        {testResult.simulated && ' (Demo Mode - Simulated)'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">{testResult.details}</div>
+                    </div>
+                  </div>
+
+                  {/* Request Details */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Request Details</Label>
+                    <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg space-y-1 text-xs font-mono">
+                      <div><span className="font-semibold">Endpoint:</span> {testResult.request?.endpoint}</div>
+                      <div><span className="font-semibold">Method:</span> {testResult.request?.method}</div>
+                      {testResult.request?.body && (
+                        <div>
+                          <span className="font-semibold">Body:</span>
+                          <pre className="mt-1 overflow-x-auto">{JSON.stringify(testResult.request.body, null, 2)}</pre>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Response Details */}
+                  {(testResult.response?.status || testResult.response?.data || testResult.response?.error) && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Response Details</Label>
+                      <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg space-y-1 text-xs font-mono">
+                        {testResult.response?.status && (
+                          <div><span className="font-semibold">Status:</span> {testResult.response.status}</div>
+                        )}
+                        {testResult.response?.responseTime && (
+                          <div><span className="font-semibold">Response Time:</span> {testResult.response.responseTime}ms</div>
+                        )}
+                        {testResult.response?.data && (
+                          <div>
+                            <span className="font-semibold">Data:</span>
+                            <pre className="mt-1 overflow-x-auto max-h-40 overflow-y-auto">{JSON.stringify(testResult.response.data, null, 2)}</pre>
+                          </div>
+                        )}
+                        {testResult.response?.error && (
+                          <div className="text-red-600">
+                            <span className="font-semibold">Error:</span> {testResult.response.error}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTestDialog(null)} disabled={testRunning}>
+                Close
+              </Button>
+              <Button onClick={runTest} disabled={testRunning || !selectedScenario}>
+                {testRunning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Run Test
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* API Keys Save Confirmation Dialog */}
+      <Dialog open={saveConfirmDialog} onOpenChange={setSaveConfirmDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              API Keys Saved Successfully
+            </DialogTitle>
+            <DialogDescription>
+              {savedKeysCount === 1
+                ? '1 API key has been saved to your browser storage.'
+                : `${savedKeysCount} API keys have been saved to your browser storage.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Alert className="bg-green-50 dark:bg-green-950 border-green-500">
+              <AlertCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-sm">
+                Your API keys are stored locally in your browser and will be used for all API calls.
+                Keys are never sent to the server.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setSaveConfirmDialog(false)}>
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>

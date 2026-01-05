@@ -25,7 +25,14 @@ interface DemoState {
   // Demo logs
   demoLogs: LogEntry[]
   setDemoLogs: (logs: LogEntry[]) => void
+  addDemoLog: (log: Omit<LogEntry, 'id' | 'createdAt'> & { userId?: string }) => void
   clearDemoLogs: () => void
+
+  // Demo costs tracking
+  totalCost: number
+  costBreakdown: { service: string; cost: number; operation: string; units: number; unitType: string }[]
+  addCost: (cost: { service: string; cost: number; operation: string; units: number; unitType: string }) => void
+  clearCosts: () => void
 
   // Demo mode management
   isDemoMode: boolean
@@ -40,6 +47,8 @@ export const useDemoStore = create<DemoState>()(
       demoSourceAudiences: [],
       demoSharedAudiences: [],
       demoLogs: [],
+      totalCost: 0,
+      costBreakdown: [],
       isDemoMode: true,
 
       addDemoSourceAudience: (audience) =>
@@ -112,7 +121,28 @@ export const useDemoStore = create<DemoState>()(
 
       setDemoLogs: (logs) => set({ demoLogs: logs }),
 
+      addDemoLog: (log) =>
+        set((state) => ({
+          demoLogs: [
+            ...state.demoLogs,
+            {
+              ...log,
+              id: crypto.randomUUID(),
+              userId: log.userId || 'demo-user',
+              createdAt: new Date(),
+            },
+          ],
+        })),
+
       clearDemoLogs: () => set({ demoLogs: [] }),
+
+      addCost: (cost) =>
+        set((state) => ({
+          costBreakdown: [...state.costBreakdown, cost],
+          totalCost: state.totalCost + cost.cost,
+        })),
+
+      clearCosts: () => set({ totalCost: 0, costBreakdown: [] }),
 
       setIsDemoMode: (enabled) => {
         set({ isDemoMode: enabled })

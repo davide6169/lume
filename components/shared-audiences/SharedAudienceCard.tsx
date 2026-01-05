@@ -6,7 +6,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Trash2, Users, CheckCircle, RotateCw, FileSpreadsheet, Copy, Check } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Trash2, Users, CheckCircle, RotateCw, FileSpreadsheet, Copy, Check, Download } from 'lucide-react'
 
 interface SharedAudienceCardProps {
   audience: SharedAudience
@@ -29,6 +31,7 @@ export function SharedAudienceCard({
 }: SharedAudienceCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [exportDialog, setExportDialog] = useState<{ open: boolean; fileName: string } | null>(null)
 
   const getFullCsv = () => {
     const headers = 'Email,FirstName,LastName,Phone,City,Country,Interests'
@@ -74,7 +77,55 @@ export function SharedAudienceCard({
     }
   }
 
+  const handleExport = () => {
+    const now = new Date()
+    const timestamp = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14) // YYYYMMDDHHMMSS
+    const defaultFileName = `lume-shared-${timestamp}.txt`
+    setExportDialog({ open: true, fileName: defaultFileName })
+  }
+
+  const confirmExport = () => {
+    if (!exportDialog) return
+
+    const content = formatSharedAsText()
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = exportDialog.fileName
+    a.click()
+    URL.revokeObjectURL(url)
+    setExportDialog(null)
+  }
+
+  const formatSharedAsText = () => {
+    const lines = [
+      `Shared Audience: ${audience.name}`,
+      `Source Audience ID: ${audience.sourceAudienceId}`,
+      `Type: ${audience.sourceAudienceType}`,
+      `Status: ${audience.uploadedToMeta ? 'Uploaded to Meta' : 'Not uploaded'}`,
+      `Created: ${new Date(audience.createdAt).toISOString()}`,
+      '',
+      `Contacts: ${audience.contacts.length}`,
+      '',
+      ...audience.contacts.map((contact, index) => {
+        return [
+          `${index + 1}. ${contact.firstName} ${contact.lastName}`,
+          `   Email: ${contact.email}`,
+          contact.phone ? `   Phone: ${contact.phone}` : '',
+          contact.city ? `   City: ${contact.city}` : '',
+          contact.country ? `   Country: ${contact.country}` : '',
+          contact.interests?.length ? `   Interests: ${contact.interests.join(', ')}` : '',
+          '',
+        ].filter(Boolean).join('\n')
+      }),
+      `Total Contacts: ${audience.contacts.length}`,
+    ]
+    return lines.flat().join('\n')
+  }
+
   return (
+    <>
     <div className="group" style={{ perspective: '1000px' }}>
       <div
         className="relative"
@@ -156,14 +207,27 @@ export function SharedAudienceCard({
               </button>
             </div>
 
-            {/* Flip indicator */}
-            <button
-              onClick={handleClick}
-              className="mt-auto pt-4 flex items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              <span>View CSV</span>
-            </button>
+            {/* Flip indicator and Export button */}
+            <div className="mt-auto pt-4 flex items-center justify-between w-full">
+              <button
+                onClick={handleClick}
+                className="flex items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                <span>View CSV</span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleExport()
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded flex items-center gap-1"
+                title="Export to TXT"
+              >
+                <Download className="h-4 w-4" />
+                <span className="text-xs">Export</span>
+              </button>
+            </div>
           </div>
         </Card>
 
@@ -226,5 +290,36 @@ export function SharedAudienceCard({
         </Card>
       </div>
     </div>
+
+    {/* Export Dialog */}
+    {exportDialog && (
+      <Dialog open={exportDialog.open} onOpenChange={() => setExportDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Shared Audience to TXT</DialogTitle>
+            <DialogDescription>
+              Choose a filename for this shared audience export. The file will be saved in plain text format.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={exportDialog.fileName}
+              onChange={(e) => setExportDialog({ ...exportDialog, fileName: e.target.value })}
+              placeholder="filename.txt"
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialog(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmExport}>
+              Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )}
+  </>
   )
 }

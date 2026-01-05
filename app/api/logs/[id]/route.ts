@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createSupabaseServerClient()
@@ -28,11 +28,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { id: logId } = await params
+
     // Delete log
     const { error: deleteError } = await supabase
       .from('logs')
       .delete()
-      .eq('id', params.id)
+      .eq('id', logId)
 
     if (deleteError) {
       console.error('Error deleting log:', deleteError)

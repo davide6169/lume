@@ -139,10 +139,12 @@ export function LogViewer({ autoRefresh = true }: LogViewerProps) {
       // All logs export
       text = logs
         .map(
-          (log) =>
-            `[${new Date(log.created_at).toISOString()}] [${log.level.toUpperCase()}] ${log.message}${
+          (log) => {
+            const timestamp = log.createdAt || log.created_at || new Date()
+            return `[${new Date(timestamp).toISOString()}] [${log.level.toUpperCase()}] ${log.message}${
               log.metadata ? ' | ' + JSON.stringify(log.metadata) : ''
             }`
+          }
         )
         .join('\n')
     }
@@ -275,7 +277,7 @@ export function LogViewer({ autoRefresh = true }: LogViewerProps) {
   }
 
   const formatLogAsText = (log: any) => {
-    const timestamp = formatDate(log.created_at)
+    const timestamp = formatDate(log.created_at || log.createdAt)
     const levelCode = getLevelCode(log.level)
 
     // If log has a timeline, format it as multiple lines
@@ -303,6 +305,53 @@ export function LogViewer({ autoRefresh = true }: LogViewerProps) {
         }
       })
 
+      return lines.join('\n')
+    }
+
+    // If log has request/response metadata (API tests), format them
+    if (log.metadata?.request || log.metadata?.response) {
+      const lines = [`${timestamp} ${levelCode} ${log.message}`]
+
+      if (log.metadata.request) {
+        lines.push('\n  Request:')
+        lines.push(`    Endpoint: ${log.metadata.request.endpoint}`)
+        lines.push(`    Method: ${log.metadata.request.method}`)
+        if (log.metadata.request.headers) {
+          lines.push(`    Headers: ${JSON.stringify(log.metadata.request.headers, null, 2).split('\n').join('\n    ')}`)
+        }
+        if (log.metadata.request.body) {
+          lines.push(`    Body: ${JSON.stringify(log.metadata.request.body, null, 2).split('\n').join('\n    ')}`)
+        }
+      }
+
+      if (log.metadata.response) {
+        lines.push('\n  Response:')
+        if (log.metadata.response.status) {
+          lines.push(`    Status: ${log.metadata.response.status}`)
+        }
+        if (log.metadata.response.responseTime) {
+          lines.push(`    Response Time: ${log.metadata.response.responseTime}ms`)
+        }
+        if (log.metadata.response.data) {
+          lines.push(`    Data: ${JSON.stringify(log.metadata.response.data, null, 2).split('\n').join('\n    ')}`)
+        }
+        if (log.metadata.response.error) {
+          lines.push(`    Error: ${log.metadata.response.error}`)
+        }
+      }
+
+      if (log.metadata.details) {
+        lines.push(`\n  Details: ${log.metadata.details}`)
+      }
+
+      return lines.join('\n')
+    }
+
+    // If log has other metadata, show them
+    if (log.metadata && Object.keys(log.metadata).length > 0) {
+      const lines = [`${timestamp} ${levelCode} ${log.message}`]
+      lines.push(`\n  Metadata:`)
+      lines.push(`    ${JSON.stringify(log.metadata, null, 2).split('\n').join('\n    ')}`)
       return lines.join('\n')
     }
 
@@ -409,7 +458,7 @@ export function LogViewer({ autoRefresh = true }: LogViewerProps) {
                             LOG
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {formatDate(log.created_at)}
+                            {formatDate(log.created_at || log.createdAt)}
                           </span>
                         </div>
                         {/* Delete button */}
@@ -471,7 +520,7 @@ export function LogViewer({ autoRefresh = true }: LogViewerProps) {
                             LOG
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {formatDate(log.created_at)}
+                            {formatDate(log.created_at || log.createdAt)}
                           </span>
                         </div>
                         {/* Copy button */}

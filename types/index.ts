@@ -102,7 +102,31 @@ export interface LogEntry {
   level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
   metadata?: Record<string, any>;
+  createdAt?: Date;
+  created_at?: Date | string; // Support both camelCase and snake_case from DB
+}
+
+export interface Job {
+  id: string;
+  userId: string;
+  type: 'SEARCH' | 'UPLOAD_TO_META';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  progress: number; // 0-100
+  payload: Record<string, any>;
+  result?: {
+    success: boolean;
+    data?: any;
+    error?: string;
+  };
+  timeline: Array<{
+    timestamp: string;
+    event: string;
+    details?: any;
+  }>;
+  startedAt?: Date;
+  completedAt?: Date;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 // ============================================

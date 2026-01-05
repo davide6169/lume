@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSourceAudiencesStore } from '@/lib/stores/useSourceAudiencesStore'
 import { useSharedAudiencesStore } from '@/lib/stores/useSharedAudiencesStore'
 import { useDemoStore } from '@/lib/stores/useDemoStore'
+import { useSupabase } from '@/components/providers/supabase-provider'
 import { SourceAudienceCard } from './SourceAudienceCard'
 import { CreateSourceAudienceDialog } from './CreateSourceAudienceDialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
+import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Trash2, Upload, Download, Search, Sparkles, CheckCircle } from 'lucide-react'
 import { AlertCircle } from 'lucide-react'
@@ -66,9 +68,20 @@ export function SourceAudienceList() {
     setIsDemoMode,
   } = useDemoStore()
 
+  const { profile } = useSupabase()
+
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobProgress, setJobProgress] = useState(0)
+  const [jobStats, setJobStats] = useState({
+    completedSources: 0,
+    totalSources: 0,
+    totalUrls: 0,
+    totalContacts: 0
+  })
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const [hasRealAudiences, setHasRealAudiences] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [exportDialog, setExportDialog] = useState(false)
@@ -80,6 +93,156 @@ export function SourceAudienceList() {
   // Check if there are real audiences in DB on mount
   useEffect(() => {
     checkRealAudiences()
+
+    // Check for any in-progress job when component mounts
+    const checkInProgressJob = async () => {
+      const savedJobId = sessionStorage.getItem('current_search_job_id')
+      if (savedJobId) {
+        console.log('[Frontend] Found in-progress job:', savedJobId)
+        setJobId(savedJobId)
+        setIsSearching(true)
+
+        // Check job status
+        try {
+          const response = await fetch(`/api/jobs/${savedJobId}`, {
+            credentials: 'include'
+          })
+          if (response.ok) {
+            const jobData = await response.json()
+
+            if (jobData.status === 'completed') {
+              console.log('[Frontend] Job was completed while away, processing result')
+              sessionStorage.removeItem('current_search_job_id')
+
+              // Process the completed job result (inline code to avoid ordering issues)
+
+              // First, update progress to 100% so UI shows it
+              setJobProgress(100)
+
+              // Small delay to ensure UI updates with 100% before showing toast
+              await new Promise(resolve => setTimeout(resolve, 500))
+
+              setIsSearching(false)
+              setJobId(null)
+
+              // Create log entry for completed job
+              const createJobLog = async () => {
+                const userId = profile?.id || 'unknown'
+                const logEntry = {
+                  userId,
+                  level: 'info' as const,
+                  message: `Search job completed - Found ${jobData.result?.data?.totalContacts || 0} contacts from ${jobData.result?.data?.sharedAudiences?.length || 0} audience(s)`,
+                  metadata: {
+                    jobId: jobData.id,
+                    jobType: jobData.type,
+                    status: jobData.status,
+                    progress: jobData.progress,
+                    timeline: jobData.timeline,
+                    result: {
+                      totalContacts: jobData.result?.data?.totalContacts,
+                      sharedAudiencesCreated: jobData.result?.data?.sharedAudiences?.length || 0,
+                      totalCost: jobData.result?.data?.totalCost
+                    }
+                  }
+                }
+
+                try {
+                  // In demo mode, add to demo store
+                  if (isDemoMode) {
+                    const { addDemoLog } = useDemoStore.getState()
+                    addDemoLog(logEntry)
+                  } else {
+                    // In production mode, save to database
+                    await fetch('/api/logs', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify(logEntry)
+                    })
+                  }
+                } catch (error) {
+                  console.error('Error creating job log:', error)
+                }
+              }
+
+              // Create log entry
+              createJobLog()
+
+              // In demo mode, add shared audiences to store
+              if (isDemoMode && jobData.result?.data?.sharedAudiences) {
+                const { addDemoSharedAudience, demoSharedAudiences, addCost, clearCosts } = useDemoStore.getState()
+
+                // Clear previous costs for this job
+                clearCosts()
+
+                for (const sharedAudience of jobData.result.data.sharedAudiences) {
+                  // Check if already exists
+                  const existing = demoSharedAudiences.find(sa => sa.sourceAudienceId === sharedAudience.sourceAudienceId)
+                  if (existing) {
+                    // Update existing
+                    useDemoStore.getState().updateDemoSharedAudience?.(existing.id, {
+                      contacts: sharedAudience.contacts,
+                      selected: true,
+                      updatedAt: new Date()
+                    })
+                  } else {
+                    // Add new
+                    addDemoSharedAudience(sharedAudience)
+                  }
+                }
+
+                // Add costs from job result
+                if (jobData.result.data.costBreakdown) {
+                  for (const cost of jobData.result.data.costBreakdown) {
+                    addCost(cost)
+                  }
+                }
+
+                const totalContacts = jobData.result.data.sharedAudiences.reduce(
+                  (sum: number, sa: any) => sum + sa.contacts.length,
+                  0
+                )
+
+                const totalCost = jobData.result.data.totalCost || 0
+                addToast('Search Complete', `Found ${totalContacts} contacts from ${jobData.result.data.sharedAudiences.length} audience(s). Cost: $${totalCost.toFixed(4)}. Check Shared Audiences to view results.`)
+
+                // Deselect all source audiences
+                deselectAllDemoSourceAudiences()
+
+                // Redirect to Shared Audiences after a short delay
+                setTimeout(() => {
+                  router.push('/shared-audiences')
+                }, 1500)
+              } else {
+                addToast('Search Complete', 'Search completed successfully. Check Shared Audiences to view results.')
+
+                // Redirect to Shared Audiences after a short delay
+                setTimeout(() => {
+                  router.push('/shared-audiences')
+                }, 1500)
+              }
+            } else if (jobData.status === 'failed') {
+              console.log('[Frontend] Job failed while away')
+              setIsSearching(false)
+              setJobId(null)
+              sessionStorage.removeItem('current_search_job_id')
+            } else {
+              console.log('[Frontend] Job still in progress, resuming polling')
+              setJobProgress(jobData.progress)
+              // Start polling will be handled by the useEffect below
+            }
+          }
+        } catch (error) {
+          console.error('[Frontend] Error checking job status:', error)
+          setIsSearching(false)
+          setJobId(null)
+          sessionStorage.removeItem('current_search_job_id')
+        }
+      }
+    }
+
+    checkInProgressJob()
+
     if (isDemoMode) {
       // Load demo data on mount if in demo mode
       if (demoSourceAudiences.length === 0) {
@@ -90,7 +253,7 @@ export function SourceAudienceList() {
       loadAudiences()
       loadSharedAudiences()
     }
-  }, [])
+  }, [router])
 
   const checkRealAudiences = async () => {
     try {
@@ -421,230 +584,285 @@ export function SourceAudienceList() {
       return
     }
 
-    // In demo mode, simulate search without API call
-    if (isDemoMode) {
-      setIsSearching(true)
-
-      const startTime = new Date().toISOString()
-      const timeline: Array<{ timestamp: string; event: string; details?: any }> = []
-      const selectedAudiences = audiences.filter((a) => a.selected)
-
-      // Create request payload
-      const requestPayload = {
-        sourceAudienceIds: selectedIds,
-        mode: 'demo',
-        timestamp: startTime
-      }
-
-      timeline.push({
-        timestamp: startTime,
-        event: 'SEARCH_STARTED',
-        details: {
-          audiencesCount: selectedIds.length,
-          totalUrls: selectedAudiences.reduce((sum, a) => sum + a.urls.length, 0)
-        }
-      })
-
-      // Simulate processing delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Create demo shared audiences for each selected source audience
-      const { addDemoSharedAudience, updateDemoSharedAudience, demoSharedAudiences } = useDemoStore.getState()
-
-      for (const sourceAudience of selectedAudiences) {
-        const processingTime = new Date().toISOString()
-
-        // Simulate API request/response for this audience
-        const apiRequest = {
-          endpoint: '/api/source-audiences/search',
-          method: 'POST',
-          body: {
-            sourceAudienceId: sourceAudience.id,
-            urls: sourceAudience.urls
-          }
-        }
-
-        const contactsPerUrl = 3
-        const contactCount = sourceAudience.urls.length * contactsPerUrl
-
-        // Simulate API response
-        const apiResponse = {
-          status: 200,
-          body: {
-            sourceAudienceId: sourceAudience.id,
-            status: 'completed',
-            contactsFound: contactCount,
-            urlsProcessed: sourceAudience.urls.length,
-            processingTimeMs: Math.floor(Math.random() * 2000) + 500
-          }
-        }
-
-        timeline.push({
-          timestamp: processingTime,
-          event: 'AUDIENCE_PROCESSING',
-          details: {
-            audienceName: sourceAudience.name,
-            audienceId: sourceAudience.id,
-            urlCount: sourceAudience.urls.length,
-            request: apiRequest,
-            response: apiResponse
-          }
-        })
-
-        const demoContacts = Array.from({ length: contactCount }, (_, i) => ({
-          firstName: `FirstName${i + 1}`,
-          lastName: `LastName${i + 1}`,
-          email: `contact${i + 1}@example.com`,
-          phone: `+12345678${(i + 1).toString().padStart(2, '0')}`,
-          city: 'Milan',
-          country: 'Italy',
-          interests: ['technology', 'business', 'marketing'].slice(0, Math.floor(Math.random() * 3) + 1),
-        }))
-
-        // Check if a shared audience already exists for this source
-        const existingShared = demoSharedAudiences.find(sa => sa.sourceAudienceId === sourceAudience.id)
-
-        if (existingShared) {
-          // Update existing shared audience with new contacts
-          updateDemoSharedAudience(existingShared.id, {
-            contacts: demoContacts,
-            selected: true,
-            updatedAt: new Date(),
-          })
-        } else {
-          // Create new shared audience
-          const sharedAudience: SharedAudience = {
-            id: crypto.randomUUID(),
-            userId: '',
-            sourceAudienceId: sourceAudience.id,
-            sourceAudienceType: sourceAudience.type,
-            name: sourceAudience.name,
-            contacts: demoContacts,
-            selected: true,
-            uploadedToMeta: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }
-
-          addDemoSharedAudience(sharedAudience)
-        }
-
-        timeline.push({
-          timestamp: new Date().toISOString(),
-          event: 'CONTACTS_EXTRACTED',
-          details: {
-            audienceName: sourceAudience.name,
-            contactsCount: contactCount
-          }
-        })
-      }
-
-      const totalContacts = selectedAudiences.reduce((sum, a) => sum + (a.urls.length * 3), 0)
-      const endTime = new Date().toISOString()
-
-      const responsePayload = {
-        status: 'completed',
-        results: selectedAudiences.map(a => ({
-          sourceAudienceId: a.id,
-          sourceAudienceName: a.name,
-          contactsFound: a.urls.length * 3,
-          urlsProcessed: a.urls.length
-        })),
-        totalContacts,
-        startTime,
-        endTime
-      }
-
-      timeline.push({
-        timestamp: endTime,
-        event: 'SEARCH_COMPLETED',
-        details: {
-          totalContacts,
-          durationMs: new Date(endTime).getTime() - new Date(startTime).getTime(),
-          response: responsePayload
-        }
-      })
-
-      // Create single log with full timeline
-      try {
-        const logEntry = {
-          id: crypto.randomUUID(),
-          level: 'info' as const,
-          message: `Search completed: ${totalContacts} contacts from ${selectedAudiences.length} audience(s)`,
-          created_at: new Date().toISOString(),
-          metadata: {
-            operation: 'SEARCH',
-            mode: 'demo',
-            timeline,
-            request: requestPayload,
-            response: responsePayload
-          }
-        }
-
-        // In demo mode, save to store instead of API
-        const { setDemoLogs, demoLogs } = useDemoStore.getState()
-        setDemoLogs([...demoLogs, logEntry])
-      } catch (error) {
-        console.error('Failed to create demo log:', error)
-      }
-
-      showConfirmation('Search Complete', `Found ${totalContacts} contacts total.`, () => {
-        // Deselect all source audiences after search
-        deselectAllDemoSourceAudiences()
-        // Navigate to shared audiences
-        router.push('/shared-audiences')
-      })
-
-      setIsSearching(false)
-
-      return
-    }
-
     setIsSearching(true)
+    setJobProgress(0)
 
     try {
-      const response = await fetch('/api/source-audiences', {
+      // Start async job (works in both demo and production mode)
+      const selectedAudiences = audiences.filter((a) => a.selected)
+
+      const requestBody: any = {
+        sourceAudienceIds: selectedIds,
+        mode: isDemoMode ? 'demo' : 'production'
+      }
+
+      // In demo mode, pass the audience data directly (they're in the store, not DB)
+      if (isDemoMode) {
+        requestBody.sourceAudiences = selectedAudiences.map(sa => ({
+          id: sa.id,
+          name: sa.name,
+          type: sa.type,
+          urls: sa.urls
+        }))
+        console.log('[Frontend] Sending demo mode request with audiences:', requestBody.sourceAudiences.length)
+      }
+
+      console.log('[Frontend] Request body:', JSON.stringify(requestBody, null, 2))
+
+      const response = await fetch('/api/source-audiences/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceAudienceIds: selectedIds }),
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
       })
-
-      console.log('Response status:', response.status)
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('Error response:', errorText)
-        throw new Error('Search failed')
+        console.error('Error starting job:', errorText)
+        throw new Error('Failed to start search job')
       }
 
       const data = await response.json()
+      const { jobId: newJobId } = data
 
-      // Reload audiences to get updated status
-      await loadAudiences()
+      console.log('[Frontend] Job started:', newJobId)
+      setJobId(newJobId)
 
-      // Reload shared audiences to get the new/updated ones
-      await loadSharedAudiences()
-
-      const totalContacts = data.results.reduce((sum: number, r: any) => sum + r.contactsFound, 0)
-
-      showConfirmation('Search Complete', `Found ${totalContacts} contacts total.`, () => {
-        // Deselect all source audiences after search (in real mode, update each one)
-        selectedIds.forEach(id => {
-          const audience = sourceAudiences.find(a => a.id === id)
-          if (audience && audience.selected) {
-            toggleSelectOne(id)
-          }
-        })
-        // Navigate to shared audiences
-        router.push('/shared-audiences')
+      // Reset job statistics
+      setJobStats({
+        completedSources: 0,
+        totalSources: 0,
+        totalUrls: 0,
+        totalContacts: 0
       })
+
+      // Save job ID to sessionStorage for persistence across navigation
+      sessionStorage.setItem('current_search_job_id', newJobId)
+
+      // Start polling job status
+      pollJobStatus(newJobId)
     } catch (error) {
-      console.error('Error searching:', error)
-      addToast('Search Failed', 'Please try again', 'destructive')
-    } finally {
+      console.error('Error starting search:', error)
+      addToast('Search Failed', 'Failed to start search job', 'destructive')
       setIsSearching(false)
+      setJobId(null)
+      setJobProgress(0)
     }
   }
+
+  // Extract job statistics from timeline
+  const extractJobStats = (jobData: any) => {
+    const stats = {
+      completedSources: 0,
+      totalSources: 0,
+      totalUrls: 0,
+      totalContacts: 0
+    }
+
+    // Get total sources from initial SEARCH_STARTED event
+    const startedEvent = jobData.timeline?.find((e: any) => e.event === 'SEARCH_STARTED')
+    if (startedEvent?.details?.audiencesCount) {
+      stats.totalSources = startedEvent.details.audiencesCount
+    }
+
+    // Count completed sources and gather URLs/contacts from timeline
+    jobData.timeline?.forEach((event: any) => {
+      if (event.event === 'AUDIENCE_PROCESSING_COMPLETED') {
+        stats.completedSources++
+        if (event.details?.contactsFound) {
+          stats.totalContacts += event.details.contactsFound
+        }
+      }
+
+      // Track URLs processed from LLM_EXTRACTION_COMPLETED events
+      if (event.event === 'LLM_EXTRACTION_COMPLETED') {
+        stats.totalUrls++
+      }
+    })
+
+    return stats
+  }
+
+  // Handle job completion - extracted for reusability
+  const handleJobCompletion = useCallback(async (jobData: any) => {
+    console.log('[Frontend] Job completed!')
+
+    // First, update progress to 100% so UI shows it
+    setJobProgress(100)
+
+    // Small delay to ensure UI updates with 100% before showing toast
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    setIsSearching(false)
+    setJobId(null)
+
+    // Clear sessionStorage
+    sessionStorage.removeItem('current_search_job_id')
+
+    // Create log entry for completed job
+    const createJobLog = async () => {
+      const userId = profile?.id || 'unknown'
+
+      const logEntry = {
+        userId,
+        level: 'info' as const,
+        message: `Search Job Completed - ${jobData.result?.data?.totalContacts || 0} contacts found`,
+        metadata: {
+          jobId: jobData.id,
+          jobType: jobData.type,
+          status: jobData.status,
+          progress: jobData.progress,
+          timeline: jobData.timeline,
+          result: {
+            totalContacts: jobData.result?.data?.totalContacts,
+            sharedAudiencesCreated: jobData.result?.data?.sharedAudiences?.length || 0
+          }
+        }
+      }
+
+      try {
+        // In demo mode, add to demo store
+        if (isDemoMode) {
+          const { addDemoLog } = useDemoStore.getState()
+          addDemoLog(logEntry)
+        } else {
+          // In production mode, save to database
+          await fetch('/api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(logEntry)
+          })
+        }
+      } catch (error) {
+        console.error('Error creating job log:', error)
+      }
+    }
+
+    // Create log entry
+    createJobLog()
+
+    // Create shared audiences in demo store
+    if (isDemoMode && jobData.result?.data?.sharedAudiences) {
+      const { addDemoSharedAudience, demoSharedAudiences, addCost, clearCosts } = useDemoStore.getState()
+
+      // Clear previous costs for this job
+      clearCosts()
+
+      for (const sharedAudience of jobData.result.data.sharedAudiences) {
+        // Check if already exists
+        const existing = demoSharedAudiences.find(sa => sa.sourceAudienceId === sharedAudience.sourceAudienceId)
+        if (existing) {
+          // Update existing
+          useDemoStore.getState().updateDemoSharedAudience?.(existing.id, {
+            contacts: sharedAudience.contacts,
+            selected: true,
+            updatedAt: new Date()
+          })
+        } else {
+          // Add new
+          addDemoSharedAudience(sharedAudience)
+        }
+      }
+
+      // Add costs from job result
+      if (jobData.result.data.costBreakdown) {
+        for (const cost of jobData.result.data.costBreakdown) {
+          addCost(cost)
+        }
+      }
+
+      const totalContacts = jobData.result.data.sharedAudiences.reduce(
+        (sum: number, sa: any) => sum + sa.contacts.length,
+        0
+      )
+
+      const totalCost = jobData.result.data.totalCost || 0
+      addToast('Search Complete', `Found ${totalContacts} contacts from ${jobData.result.data.sharedAudiences.length} audience(s). Cost: $${totalCost.toFixed(4)}. Check Shared Audiences to view results.`)
+
+      // Deselect all source audiences
+      deselectAllDemoSourceAudiences()
+
+      // Redirect to Shared Audiences after a short delay
+      setTimeout(() => {
+        router.push('/shared-audiences')
+      }, 1500)
+    } else {
+      addToast('Search Complete', 'Search completed successfully. Check Shared Audiences to view results.')
+
+      // Redirect to Shared Audiences after a short delay
+      setTimeout(() => {
+        router.push('/shared-audiences')
+      }, 1500)
+    }
+
+    // Stop polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
+  }, [isDemoMode, deselectAllDemoSourceAudiences, addToast, profile, router])
+
+  // Poll job status
+  const pollJobStatus = useCallback(async (jobIdToPoll: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${jobIdToPoll}`, {
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        console.error('Error fetching job status')
+        return
+      }
+
+      const jobData = await response.json()
+      console.log('[Frontend] Job status:', jobData.status, 'Progress:', jobData.progress)
+
+      setJobProgress(jobData.progress)
+
+      // Extract and update job statistics
+      const stats = extractJobStats(jobData)
+      setJobStats(stats)
+
+      if (jobData.status === 'completed') {
+        handleJobCompletion(jobData)
+      } else if (jobData.status === 'failed') {
+        console.error('[Frontend] Job failed:', jobData.result?.error)
+        addToast('Search Failed', jobData.result?.error || 'Search job failed', 'destructive')
+        setIsSearching(false)
+        setJobId(null)
+        setJobProgress(0)
+        sessionStorage.removeItem('current_search_job_id')
+
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
+        }
+      }
+      // If still processing, continue polling
+    } catch (error) {
+      console.error('Error polling job status:', error)
+    }
+  }, [isDemoMode, deselectAllDemoSourceAudiences, addToast, handleJobCompletion, profile])
+
+  // Start polling when jobId changes
+  useEffect(() => {
+    if (jobId && isSearching) {
+      // Poll every 2 seconds
+      pollingRef.current = setInterval(() => {
+        if (jobId) {
+          pollJobStatus(jobId)
+        }
+      }, 2000)
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+    }
+  }, [jobId, isSearching, pollJobStatus])
 
   return (
     <div className="space-y-6">
@@ -689,6 +907,50 @@ export function SourceAudienceList() {
           <CreateSourceAudienceDialog onCreate={handleCreate} />
         </div>
       </div>
+
+      {/* Progress Bar - shown when searching */}
+      {isSearching && jobId && (
+        <div className="bg-muted/50 p-4 rounded-lg border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Processing Search...</span>
+            <span className="text-sm text-muted-foreground">{jobProgress}%</span>
+          </div>
+          <Progress value={jobProgress} className="h-2" />
+
+          {/* Job Statistics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+            <div className="text-center">
+              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                {jobStats.completedSources}/{jobStats.totalSources}
+              </div>
+              <div className="text-xs text-muted-foreground">Sources</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                {jobStats.totalUrls}
+              </div>
+              <div className="text-xs text-muted-foreground">URLs Processed</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                {jobStats.totalContacts}
+              </div>
+              <div className="text-xs text-muted-foreground">Contacts Found</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                {jobStats.totalSources - jobStats.completedSources}
+              </div>
+              <div className="text-xs text-muted-foreground">Remaining</div>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-3">
+            You can continue using the app. Results will appear in Shared Audiences when complete.
+            Check the Logs page for detailed progress.
+          </p>
+        </div>
+      )}
 
       {/* Search and Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4">
