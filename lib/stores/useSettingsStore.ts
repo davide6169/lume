@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ExportableSettings } from '@/types'
+import { encryptApiKeys, decryptApiKeys, encryptSupabaseConfig, decryptSupabaseConfig } from '@/lib/utils/encryption'
 
 interface SettingsState {
   // Demo mode
@@ -84,10 +85,13 @@ export const useSettingsStore = create<SettingsState>()(
 
       setSelectedEmbeddingModel: (model) => set({ selectedEmbeddingModel: model }),
 
-      setApiKey: (service, key) =>
+      setApiKey: (service, key) => {
+        // Encrypt the API key before storing
+        const encrypted = encryptApiKeys({ [service]: key })
         set((state) => ({
-          apiKeys: { ...state.apiKeys, [service]: key },
-        })),
+          apiKeys: { ...state.apiKeys, ...encrypted },
+        }))
+      },
 
       removeApiKey: (service) =>
         set((state) => {
@@ -96,13 +100,16 @@ export const useSettingsStore = create<SettingsState>()(
           return { apiKeys: newKeys }
         }),
 
-      setSupabaseConfig: (url, anonKey) =>
-        set((state) => ({
-          supabaseConfig: {
-            url: url.trim(),
-            anonKey: anonKey.trim(),
-          },
-        })),
+      setSupabaseConfig: (url, anonKey) => {
+        // Encrypt Supabase config before storing
+        const encrypted = encryptSupabaseConfig({
+          url: url.trim(),
+          anonKey: anonKey.trim(),
+        })
+        set(() => ({
+          supabaseConfig: encrypted,
+        }))
+      },
 
       clearSupabaseConfig: () =>
         set((state) => ({
@@ -114,34 +121,45 @@ export const useSettingsStore = create<SettingsState>()(
 
       hasUserSupabaseConfig: () => {
         const { supabaseConfig } = get()
+        // Decrypt config before checking
+        const decrypted = decryptSupabaseConfig(supabaseConfig)
         return (
-          supabaseConfig.url !== '' &&
-          supabaseConfig.anonKey !== '' &&
-          !supabaseConfig.url.includes('your-project') &&
-          !supabaseConfig.anonKey.includes('your-anon-key')
+          decrypted.url !== '' &&
+          decrypted.anonKey !== '' &&
+          !decrypted.url.includes('your-project') &&
+          !decrypted.anonKey.includes('your-anon-key')
         )
       },
 
       exportSettings: () => {
         const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig } = get()
+        // Decrypt sensitive data before export (WARNING: this still exposes keys!)
+        const decryptedApiKeys = decryptApiKeys(apiKeys)
+        const decryptedSupabaseConfig = decryptSupabaseConfig(supabaseConfig)
         return {
-          apiKeys,
+          apiKeys: decryptedApiKeys,
           demoMode,
           logsEnabled,
           selectedLlmModel,
           selectedEmbeddingModel,
-          supabaseConfig,
+          supabaseConfig: decryptedSupabaseConfig,
         }
       },
 
       importSettings: (settings) => {
+        // Encrypt sensitive data on import
+        const encryptedApiKeys = settings.apiKeys ? encryptApiKeys(settings.apiKeys) : {}
+        const encryptedSupabaseConfig = settings.supabaseConfig
+          ? encryptSupabaseConfig(settings.supabaseConfig)
+          : { url: '', anonKey: '' }
+
         set({
-          apiKeys: settings.apiKeys || {},
+          apiKeys: encryptedApiKeys,
           demoMode: settings.demoMode ?? true,
           logsEnabled: settings.logsEnabled ?? (settings.demoMode ?? true), // Default based on demo mode
           selectedLlmModel: settings.selectedLlmModel || 'mistral-7b-instruct:free',
           selectedEmbeddingModel: settings.selectedEmbeddingModel || 'mxbai-embed-large-v1',
-          supabaseConfig: settings.supabaseConfig || { url: '', anonKey: '' },
+          supabaseConfig: encryptedSupabaseConfig,
         })
       },
 
@@ -189,6 +207,29 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'lume-settings',
+      // Transform state to/from storage for encryption
+      partialize: (state) => ({
+        demoMode: state.demoMode,
+        logsEnabled: state.logsEnabled,
+        selectedLlmModel: state.selectedLlmModel,
+        selectedEmbeddingModel: state.selectedEmbeddingModel,
+        apiKeys: state.apiKeys, // Already encrypted
+        supabaseConfig: state.supabaseConfig, // Already encrypted
+      }),
+      // Decrypt state on hydration from localStorage
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Decrypt API keys on load (safeDecrypt handles both encrypted and plain text)
+          if (state.apiKeys && Object.keys(state.apiKeys).length > 0) {
+            state.apiKeys = decryptApiKeys(state.apiKeys)
+          }
+
+          // Decrypt Supabase config on load (safeDecrypt handles both encrypted and plain text)
+          if (state.supabaseConfig && (state.supabaseConfig.url || state.supabaseConfig.anonKey)) {
+            state.supabaseConfig = decryptSupabaseConfig(state.supabaseConfig)
+          }
+        }
+      },
     }
   )
 )

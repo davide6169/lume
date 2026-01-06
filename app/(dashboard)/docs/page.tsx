@@ -235,6 +235,32 @@ export default function DocsPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="p-4 border rounded-lg bg-red-50 dark:bg-red-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-5 w-5 text-red-600" />
+                  <h4 className="font-semibold">Security Features (v1.1.0+)</h4>
+                  <Badge variant="destructive">Critical Updates</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    Enhanced security measures to protect your data and credentials:
+                  </p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• <strong>AES-256 Encryption</strong> for all API keys and database credentials stored locally</li>
+                    <li>• <strong>Authentication Required</strong> even in demo mode (no more auth bypass)</li>
+                    <li>• <strong>Input Validation</strong> on all API endpoints using Zod schemas</li>
+                    <li>• <strong>Export Warnings</strong> for sensitive data (credentials exposed in plain text)</li>
+                    <li>• <strong>Safe Decryption</strong> with backward compatibility for existing data</li>
+                  </ul>
+                  <div className="mt-3 p-2 bg-red-100 dark:bg-red-900 rounded text-xs">
+                    <strong>Encryption Details:</strong> Credentials are encrypted using AES-256 with a configurable key. The system automatically handles both encrypted and legacy plain text data for seamless migration.
+                  </div>
+                  <p className="text-xs text-red-700 dark:text-red-300 mt-2">
+                    🔒 All sensitive data is now encrypted at rest in localStorage using industry-standard encryption.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -442,7 +468,11 @@ export default function DocsPage() {
                     <li>• <strong>Export:</strong> Download all settings as JSON file (includes Supabase config)</li>
                     <li>• <strong>Import:</strong> Upload JSON file to restore settings</li>
                     <li>• <strong>Team Sharing:</strong> Admins can export config for new team members</li>
+                    <li>• <strong>Security Warning:</strong> Export shows prominent warning about sensitive credentials</li>
                   </ul>
+                  <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900 rounded text-xs">
+                    <strong>⚠️ Important:</strong> Exported files contain API keys and database credentials in plain text. Never share exported files publicly or commit them to version control!
+                  </div>
                 </div>
 
                 <div className="border-t pt-3">

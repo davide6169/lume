@@ -110,8 +110,19 @@
 - **Protected Actions**: Prevent admins from removing their own admin role
 - **Multi-Tenant Support**: Each organization can manage their own users independently
 - **Demo Data**: In Demo mode, shows dummy data (1 admin + 3 users with 2 pending) for testing
+- **Input Validation**: All user updates validated with Zod schemas (v1.1.1+)
 
-### 9. System Logging
+### 9. Security & Encryption (v1.1.1+)
+- **AES-256 Encryption**: All API keys and database credentials encrypted at rest in localStorage
+- **Authentication Enforcement**: Authentication required even in demo mode (no auth bypass)
+- **Input Validation**: Zod schemas validate all API endpoint inputs
+- **Safe Decryption**: Backward compatible with existing plain text data
+- **Export Warnings**: Prominent security warnings when exporting sensitive credentials
+- **Encryption Key**: Configurable via `LUME_ENCRYPTION_KEY` environment variable
+- **Client-Side Encryption**: Industry-standard CryptoJS AES encryption
+- **Transparent Migration**: Automatically handles both encrypted and legacy data
+
+### 10. System Logging
 - **Admin-Only Access**: Comprehensive system logs for administrators
 - **Multiple Log Levels**: info, warn, error, debug
 - **Detailed Metadata**: Request/response data for API calls
@@ -132,6 +143,8 @@
 | **Recharts** | 3.6 | Data visualization |
 | **Lucide React** | Latest | Icon library |
 | **next-themes** | Latest | Dark mode support |
+| **CryptoJS** | Latest | AES-256 encryption for sensitive data (v1.1.1+) |
+| **Zod** | Latest | Runtime type validation and input sanitization (v1.1.1+) |
 
 ### Backend
 | Technology | Version | Purpose |
@@ -1731,6 +1744,33 @@ Proprietary - All rights reserved
 ---
 
 ## Changelog
+
+### Version 1.1.1 (January 2026) - Security Hardening Release 🔒
+- **CRITICAL: Authentication Bypass Fix**: Removed demo mode auth bypass vulnerability (middleware.ts)
+- **AES-256 Encryption**: All API keys and database credentials now encrypted at rest in localStorage
+- **Input Validation**: Zod schemas added to all critical API endpoints (/api/users, /api/settings/save)
+- **Safe Decryption**: Backward compatible handling of encrypted and legacy plain text data
+- **Export Security Warning**: Prominent warning dialog when exporting sensitive credentials
+- **Security Documentation**: Added comprehensive security features section in docs
+
+**Security Fixes**:
+- `lib/utils/encryption.ts`: New encryption utility with AES-256 and safeDecrypt()
+- `lib/validation/schemas.ts`: Zod validation schemas for all API inputs
+- `middleware.ts`: Fixed authentication bypass - auth now required even in demo mode
+- `lib/stores/useSettingsStore.ts`: Automatic encryption on save, decryption on load
+- `app/(dashboard)/settings/page.tsx`: Security warning with AlertTitle component
+- `app/api/users/route.ts`: Input validation with updateUserSchema
+- `app/api/settings/save/route.ts`: Input validation with saveSettingsSchema
+- `lib/supabase/client.ts`: Safe decryption of Supabase config
+
+**New Dependencies**:
+- `crypto-js`: AES-256 encryption library
+- `zod`: Runtime type validation
+
+**Backward Compatibility**:
+- Existing plain text credentials in localStorage continue to work
+- System auto-detects and handles both encrypted and plain text data
+- No manual migration required
 
 ### Version 1.1.0 (January 2025) - Multi-Tenant Release
 - **Multi-tenant architecture**: Each user can configure their own Supabase database

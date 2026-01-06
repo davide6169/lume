@@ -1,5 +1,6 @@
 import { createNextResponse } from '@/lib/api-utils'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { validateRequestBody, updateUserSchema, formatZodError } from '@/lib/validation/schemas'
 
 /**
  * GET /api/users
@@ -68,36 +69,35 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { userId, role, status } = body
 
-    // Validate input
-    if (!userId) {
-      return createNextResponse({ error: 'Invalid input' }, { status: 400 })
+    // Validate input using Zod schema
+    const validation = validateRequestBody(updateUserSchema, body)
+
+    if (validation.error) {
+      const errors = formatZodError(validation.error.details)
+      console.error('[API] Validation error:', errors)
+      return createNextResponse({
+        error: 'Validation failed',
+        details: errors
+      }, { status: 400 })
+    }
+
+    const { userId, role, status } = validation.data!
+
+    // Prevent removing own admin role
+    if (userId === user.id && role === 'user') {
+      return createNextResponse({ error: 'Cannot remove your own admin role' }, { status: 400 })
     }
 
     // Build update object based on what's provided
     const updateData: Record<string, string> = {}
-    let updateType = ''
 
     if (role) {
-      if (!['admin', 'user'].includes(role)) {
-        return createNextResponse({ error: 'Invalid role' }, { status: 400 })
-      }
       updateData.role = role
-      updateType = 'role'
     }
 
     if (status) {
-      if (!['pending', 'approved'].includes(status)) {
-        return createNextResponse({ error: 'Invalid status' }, { status: 400 })
-      }
       updateData.status = status
-      updateType = updateType ? 'role and status' : 'status'
-    }
-
-    // Prevent removing own admin role
-    if (userId === user.id && role && role !== 'admin') {
-      return createNextResponse({ error: 'Cannot remove your own admin role' }, { status: 400 })
     }
 
     // Update user
@@ -110,7 +110,7 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error('[API] Error updating user:', error)
-      return createNextResponse({ error: `Failed to update user ${updateType}` }, { status: 500 })
+      return createNextResponse({ error: 'Failed to update user' }, { status: 500 })
     }
 
     return createNextResponse({

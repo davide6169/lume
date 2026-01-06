@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ensureProfileExists } from '@/lib/supabase/queries'
 import { NextResponse } from 'next/server'
+import { validateRequestBody, saveSettingsSchema, formatZodError } from '@/lib/validation/schemas'
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +19,20 @@ export async function POST(request: Request) {
     await ensureProfileExists(user.id, user.email)
 
     const body = await request.json()
-    const { demoMode, logsEnabled } = body
+
+    // Validate input using Zod schema
+    const validation = validateRequestBody(saveSettingsSchema, body)
+
+    if (validation.error) {
+      const errors = formatZodError(validation.error.details)
+      console.error('[Settings Save] Validation error:', errors)
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: errors
+      }, { status: 400 })
+    }
+
+    const { demoMode, logsEnabled } = validation.data!
 
     // Update user settings in database
     const { error: updateError } = await supabase
@@ -35,7 +49,7 @@ export async function POST(request: Request) {
     if (updateError) {
       console.error('[Settings Save] Error updating settings:', updateError)
       return NextResponse.json(
-        { error: 'Failed to save settings', details: updateError.message },
+        { error: 'Failed to save settings' },
         { status: 500 }
       )
     }
@@ -54,7 +68,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[Settings Save] Error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

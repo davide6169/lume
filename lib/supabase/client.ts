@@ -1,6 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { publicEnv, hasRealApiKeys } from '@/lib/config/env'
 import { useSettingsStore } from '@/lib/stores/useSettingsStore'
+import { decryptSupabaseConfig } from '@/lib/utils/encryption'
 
 export function createSupabaseClient() {
   // Try to use user-configured credentials first (for multi-tenant setup)
@@ -8,9 +9,17 @@ export function createSupabaseClient() {
 
   // Check if user has configured their own Supabase
   if (userConfig.url && userConfig.anonKey) {
-    const hasValidUserConfig = useSettingsStore.getState().hasUserSupabaseConfig()
+    // Decrypt config before using (handles both encrypted and plain text)
+    const decryptedConfig = decryptSupabaseConfig(userConfig)
+
+    const hasValidUserConfig =
+      decryptedConfig.url !== '' &&
+      decryptedConfig.anonKey !== '' &&
+      !decryptedConfig.url.includes('your-project') &&
+      !decryptedConfig.anonKey.includes('your-anon-key')
+
     if (hasValidUserConfig) {
-      return createBrowserClient(userConfig.url, userConfig.anonKey)
+      return createBrowserClient(decryptedConfig.url, decryptedConfig.anonKey)
     }
   }
 

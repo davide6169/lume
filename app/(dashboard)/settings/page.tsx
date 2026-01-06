@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText, Play, CheckCircle, XCircle, Loader2, Database } from 'lucide-react'
 import { getTestScenarios } from '@/lib/services/api-test-definitions'
@@ -571,6 +571,25 @@ export default function SettingsPage() {
               Choose a filename for your export. The file will be saved in JSON format.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Security Warning */}
+          <Alert variant="destructive" className="border-amber-500 bg-amber-50 dark:bg-amber-950">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-900 dark:text-amber-100">⚠️ Security Warning</AlertTitle>
+            <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
+              <div className="space-y-2">
+                <p><strong>This export contains sensitive credentials in plain text:</strong></p>
+                <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                  <li>API keys (Meta, OpenRouter, Mixedbread, Apollo, Hunter)</li>
+                  <li>Supabase database URL and anon key</li>
+                </ul>
+                <p className="text-xs font-semibold mt-2">
+                  DO NOT share this file publicly or commit it to version control!
+                </p>
+              </div>
+            </AlertDescription>
+          </Alert>
+
           <div className="py-4">
             <Input
               value={exportFileName}
@@ -583,8 +602,8 @@ export default function SettingsPage() {
             <Button variant="outline" onClick={() => setExportDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={confirmExport}>
-              Export
+            <Button onClick={confirmExport} variant="default">
+              I Understand, Export
             </Button>
           </DialogFooter>
         </DialogContent>

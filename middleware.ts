@@ -3,17 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { publicEnv, hasRealApiKeys } from '@/lib/config/env'
 
 export async function middleware(request: NextRequest) {
-  // If using placeholder keys, skip authentication (demo mode)
-  if (!hasRealApiKeys()) {
-    return NextResponse.next({
-      request,
-    })
-  }
-
   let supabaseResponse = NextResponse.next({
     request,
   })
 
+  // Always create Supabase client and check authentication
+  // Even in demo mode, users must be authenticated to access protected routes
   const supabase = createServerClient(
     publicEnv.supabaseUrl,
     publicEnv.supabaseAnonKey,
