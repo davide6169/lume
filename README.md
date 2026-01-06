@@ -94,6 +94,46 @@ lume/
 
 ---
 
+## 💼 Modello B2B "Chiavi in Mano"
+
+Lume è progettato per essere fornito come soluzione "chiavi in mano" a clienti B2B.
+
+### Cosa Offriamo
+
+- ✅ **Licenza software perpetua** per ogni cliente
+- ✅ **Setup completo** dell'ambiente di produzione
+- ✅ **Configurazione hosting** (Vercel) e database (Supabase)
+- ✅ **Personalizzazione branding** (logo, colori, dominio)
+- ✅ **Formazione team** (2 giorni onsite/remote)
+- ✅ **Manutenzione evolutiva** con contratto annuale
+
+### Isolamento Completo
+
+Ogni cliente ha:
+- 📦 Proprio repository GitHub dedicato
+- 🌐 Propria istanza Vercel
+- 🗄️ Proprio database Supabase
+- 🔑 Proprie API keys
+- 👥 Propri utenti
+- 📊 Propri dati
+
+### Documentazione
+
+Per il processo di onboarding completo, consulta:
+
+- **📖 [CLIENT_ONBOARDING.md](./CLIENT_ONBOARDING.md)** - Guida completa onboarding (9 fasi)
+- **📋 [README_CLIENT_TEMPLATE.md](./README_CLIENT_TEMPLATE.md)** - Template README per clienti
+
+### Vantaggi per i Clienti
+
+- ✅ **Proprietà dati**: Database completamente isolato
+- ✅ **Indipendenza**: Nessuna condivisione con altri clienti
+- ✅ **Scalabilità**: Ogni cliente scala indipendentemente
+- ✅ **Customizzabile**: Possibilità di modifiche su misura
+- ✅ **Supporto diretto**: Contratto di manutenzione dedicato
+
+---
+
 ## 📦 Build
 
 ```bash
