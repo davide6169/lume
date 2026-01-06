@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { logout } from '@/app/auth/actions'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import { useSettingsStore } from '@/lib/stores/useSettingsStore'
 import { useDemoStore } from '@/lib/stores/useDemoStore'
+import { useDemoModeDetection } from '@/lib/hooks/use-demo-mode-detection'
 import { JobNotificationProvider } from '@/components/providers/job-notification-provider'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,6 +37,7 @@ import {
   Instagram,
   Sparkles,
   BookOpen,
+  Shield,
 } from 'lucide-react'
 
 const navItems = [
@@ -60,6 +62,12 @@ const navItems = [
     name: 'Filters',
     href: '/filters',
     icon: Filter,
+  },
+  {
+    name: 'Users',
+    href: '/users',
+    icon: Shield,
+    adminOnly: true,
   },
   {
     name: 'Logs',
@@ -90,9 +98,11 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const { profile } = useSupabase()
-  const { logsEnabled } = useSettingsStore()
+  const router = useRouter()
+  const { profile, user } = useSupabase()
+  const { logsEnabled, hasUserSupabaseConfig } = useSettingsStore()
   const { isDemoMode, setIsDemoMode } = useDemoStore()
+  const { canDisableDemoMode } = useDemoModeDetection()
   const [mounted, setMounted] = useState(false)
 
   // Ensure client-side hydration is complete before using logsEnabled
@@ -100,14 +110,22 @@ export default function DashboardLayout({
     setMounted(true)
   }, [])
 
-  const userInitials = profile?.fullName
-    ? profile.fullName
-        .split(' ')
-        .map((n: string) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'U'
+  // Force demo mode for pending users
+  useEffect(() => {
+    if (profile?.status === 'pending' && !isDemoMode) {
+      setIsDemoMode(true)
+      useSettingsStore.getState().setDemoMode(true)
+    }
+  }, [profile?.status, isDemoMode])
+
+  // Get user initial - first letter of name or email
+  const userInitial = profile?.fullName
+    ? profile.fullName.split(' ')[0][0].toUpperCase() // First letter of first name
+    : user?.email
+    ? user.email.split('@')[0][0].toUpperCase() // First letter of email username
+    : isDemoMode
+    ? 'D' // Demo Mode
+    : 'U' // User fallback
 
   return (
     <JobNotificationProvider>
@@ -125,7 +143,12 @@ export default function DashboardLayout({
               <Separator orientation="vertical" className="h-6" />
               <nav className="hidden md:flex items-center gap-1">
                 {navItems.map((item) => {
-                  if (item.adminOnly && profile?.role !== 'admin') {
+                  // In demo mode, show admin-only items if logs are enabled
+                  // This allows testing the UI without a real account
+                  const isAdmin = profile?.role === 'admin'
+                  const canSeeAdminItems = isAdmin || (isDemoMode && logsEnabled)
+
+                  if (item.adminOnly && !canSeeAdminItems) {
                     return null
                   }
 
@@ -158,14 +181,26 @@ export default function DashboardLayout({
                   <span className="text-sm font-medium">Demo</span>
                   <Switch
                     checked={isDemoMode}
+                    disabled={!canDisableDemoMode && isDemoMode}
                     onCheckedChange={(checked) => {
+                      // Prevent pending users from disabling demo mode
+                      if (profile?.status === 'pending' && !checked) {
+                        return
+                      }
+
+                      // If trying to disable demo mode and no Supabase config, redirect to setup
+                      if (!checked && !hasUserSupabaseConfig()) {
+                        router.push('/setup-database')
+                        return
+                      }
+
                       setIsDemoMode(checked)
                       // Also sync with settings store
                       useSettingsStore.getState().setDemoMode(checked)
                     }}
                   />
                   <span className="text-xs text-muted-foreground">
-                    {isDemoMode ? 'ON' : 'OFF'}
+                    {profile?.status === 'pending' ? 'LOCKED' : (isDemoMode ? 'ON' : 'OFF')}
                   </span>
                 </div>
               </nav>
@@ -178,7 +213,7 @@ export default function DashboardLayout({
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                        {userInitials}
+                        {userInitial}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -186,12 +221,14 @@ export default function DashboardLayout({
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{profile?.fullName || 'User'}</p>
+                      <p className="text-sm font-medium">
+                        {profile?.fullName || user?.email?.split('@')[0] || isDemoMode ? 'Demo User' : 'User'}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        {profile?.email}
+                        {profile?.email || user?.email || isDemoMode ? 'demo@lume.app' : ''}
                       </p>
                       <p className="text-xs text-muted-foreground capitalize">
-                        {profile?.role}
+                        {profile?.role || (isDemoMode ? 'demo' : 'user')}
                       </p>
                     </div>
                   </DropdownMenuLabel>

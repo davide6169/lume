@@ -20,6 +20,8 @@
 
 ### Value Proposition
 
+- **Multi-Tenant Architecture**: Each user can configure their own Supabase database for complete data isolation
+- **Zero Server Configuration**: Deploy on Vercel without any server-side credentials - users configure their own databases
 - **AI-Powered Extraction**: Automatically extract contacts from Facebook/Instagram posts and comments
 - **Multi-Source Enrichment**: Enhance contact data using Apollo.io and Hunter.io APIs
 - **Smart Filtering**: Create complex logical filters to segment audiences
@@ -39,13 +41,22 @@
 
 ## Key Features
 
-### 1. Source Audience Management
+### 1. Multi-Tenant Architecture (NEW)
+- **User-Configured Databases**: Each user can connect their own Supabase project
+- **Complete Data Isolation**: Every user's data stays in their own database
+- **Zero Server Setup**: Deploy without any server-side API credentials
+- **User Approval System**: New users require admin approval before accessing the system
+- **Pending User Lock**: Pending users are locked in Demo mode until approved
+- **Automatic Admin Assignment**: First user to sign up becomes admin automatically
+- **Setup Flow**: Guided database configuration in Settings → Database tab
+
+### 2. Source Audience Management
 - **Create Collections**: Organize Facebook/Instagram URLs into source audiences
 - **Multiple Sources**: Support for Facebook pages, groups, posts; Instagram profiles and media
 - **Batch Processing**: Select and process multiple audiences simultaneously
 - **Status Tracking**: Real-time status updates (pending, processing, completed, failed)
 
-### 2. Contact Extraction Pipeline
+### 3. Contact Extraction Pipeline
 **Multi-Stage Enrichment Process:**
 1. **Content Fetching**: Retrieve posts/comments from Meta GraphAPI
 2. **AI Extraction**: Use LLM (OpenRouter) to extract structured contact data
@@ -56,14 +67,14 @@
 7. **Email Verification**: Hunter.io Email Verifier
 8. **Vector Embeddings**: Mixedbread AI for semantic search capability
 
-### 3. Audience Management
+### 4. Audience Management
 - **Shared Audiences**: View extracted contacts with full details
 - **Contact Details**: First name, last name, email, phone, city, country, interests
 - **Logical Filtering**: Create complex filter rules with AND/OR logic
 - **Export Options**: CSV export (Meta Ads compliant format)
 - **Direct Upload**: Upload directly to Meta Custom Audiences
 
-### 4. Filter System
+### 5. Filter System
 **Supported Fields:**
 - First Name, Last Name, Email, Phone
 - City, Country, Interests
@@ -77,19 +88,30 @@
 - AND: All conditions must be true
 - OR: At least one condition must be true
 
-### 5. Cost Tracking
+### 6. Cost Tracking
 - **Real-time Monitoring**: Track costs as they accumulate
 - **Per-Service Breakdown**: View costs by API service
 - **Operation-Level Tracking**: See costs for individual operations
 - **Historical Data**: Access cost history via dashboard
 
-### 6. Demo Mode
+### 7. Demo Mode
 - **Risk-Free Testing**: Test all features without spending credits
 - **Realistic Simulation**: Simulated API calls with accurate delays
 - **Data Isolation**: Demo data stored separately from production
 - **Instant Toggle**: Switch between demo and production modes
+- **Setup Prompt**: When disabling Demo mode, users are guided to configure their database
 
-### 7. System Logging
+### 8. User Management (NEW)
+- **Admin-Only Interface**: View and manage all users in your organization
+- **User Approval Workflow**: Approve pending users to grant them system access
+- **Role Management**: Promote or demote users between admin and regular user roles
+- **User List**: See all users with their email, name, role, status, and join date
+- **Status Tracking**: View user status (pending/approved) and role (admin/user)
+- **Protected Actions**: Prevent admins from removing their own admin role
+- **Multi-Tenant Support**: Each organization can manage their own users independently
+- **Demo Data**: In Demo mode, shows dummy data (1 admin + 3 users with 2 pending) for testing
+
+### 9. System Logging
 - **Admin-Only Access**: Comprehensive system logs for administrators
 - **Multiple Log Levels**: info, warn, error, debug
 - **Detailed Metadata**: Request/response data for API calls
@@ -244,12 +266,15 @@ app/
 ├── (auth)/                    # Authentication pages (public)
 │   ├── login/
 │   └── signup/
+├── account-pending/           # Pending user page (middleware redirect)
+│   └── page.tsx              # Shows account details, demo mode locked
 ├── (dashboard)/               # Protected pages (require auth)
 │   ├── dashboard/            # Statistics overview
 │   ├── source-audiences/     # URL collection management
 │   ├── shared-audiences/     # Extracted contacts
 │   ├── filters/              # Filter builder
 │   ├── settings/             # Configuration
+│   ├── users/                # User management (admin only)
 │   ├── logs/                 # Admin logs
 │   └── docs/                 # Documentation
 └── api/                      # Backend routes
@@ -318,6 +343,17 @@ LogViewer
      selectedLlmModel: string
      selectedEmbeddingModel: string
      apiKeys: Record<string, string>
+     // Multi-tenant configuration
+     supabaseConfig: {
+       url: string
+       anonKey: string
+     }
+     setSupabaseConfig: (url: string, anonKey: string) => void
+     clearSupabaseConfig: () => void
+     hasUserSupabaseConfig: () => boolean
+     // Import/Export
+     exportSettings: () => string
+     importSettings: (settingsJson: string) => void
      // ... setters
    }
    ```
@@ -394,7 +430,40 @@ CREATE TABLE profiles (
 - `id`: UUID matching Supabase Auth user ID
 - `email`: User email address
 - `full_name`: User's full name
-- `role`: 'admin' or 'user' (first user is automatically admin)
+- `role`: 'admin' or 'user'
+- `status`: 'pending' or 'approved'
+
+**Automatic Admin Assignment:**
+The first user who signs up automatically becomes admin and approved. All subsequent users are regular users and require approval:
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+  user_role TEXT;
+  user_status TEXT;
+  user_count INTEGER;
+BEGIN
+  -- Count existing users
+  SELECT COUNT(*) INTO user_count FROM public.profiles;
+
+  -- First user becomes admin and approved, all others are regular users pending approval
+  IF user_count = 0 THEN
+    user_role := 'admin';
+    user_status := 'approved';
+  ELSE
+    user_role := 'user';
+    user_status := 'pending';
+  END IF;
+
+  INSERT INTO public.profiles (id, email, full_name, role, status)
+  VALUES (NEW.id, NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+    user_role,
+    user_status);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
 
 **Relationships:**
 - One-to-many with all user-owned tables
@@ -629,6 +698,98 @@ Meta OAuth callback handler.
 - `code`: OAuth authorization code
 - `state`: OAuth state parameter
 
+### Users (Admin Only)
+
+#### `GET /api/users`
+Get all users in the organization (admin only).
+
+**Response:**
+```json
+{
+  "users": [
+    {
+      "id": "uuid",
+      "email": "admin@example.com",
+      "full_name": "Admin User",
+      "role": "admin",
+      "created_at": "2025-01-05T10:00:00Z"
+    },
+    {
+      "id": "uuid-2",
+      "email": "user@example.com",
+      "full_name": "Regular User",
+      "role": "user",
+      "created_at": "2025-01-06T14:30:00Z"
+    }
+  ]
+}
+```
+
+#### `PATCH /api/users`
+Update user role or status (admin only).
+
+**Body (Role Update):**
+```json
+{
+  "userId": "uuid-2",
+  "role": "admin"
+}
+```
+
+**Body (Status Update):**
+```json
+{
+  "userId": "uuid-2",
+  "status": "approved"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "user": {
+    "id": "uuid-2",
+    "email": "user@example.com",
+    "full_name": "Regular User",
+    "role": "admin",
+    "status": "approved",
+    "created_at": "2025-01-06T14:30:00Z"
+  }
+}
+```
+
+**Error Cases:**
+- 403: Requester is not admin
+- 400: Invalid input or trying to remove own admin role
+- 500: Server error
+
+### Authentication & Middleware
+
+#### Pending User Redirect
+Middleware automatically redirects pending users to Account Pending page:
+```typescript
+// In middleware.ts
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('status')
+  .eq('id', user.id)
+  .single()
+
+if (profile?.status === 'pending' && request.nextUrl.pathname !== '/account-pending') {
+  const url = request.nextUrl.clone()
+  url.pathname = '/account-pending'
+  return NextResponse.redirect(url)
+}
+```
+
+**Account Pending Page Features:**
+- Displays user account details (email, name, registration date)
+- Shows clear notice about account awaiting approval
+- Demo mode is locked ON (cannot disable)
+- Logout button available
+- Instructions to contact administrator
+
 ### Source Audiences
 
 #### `GET /api/source-audiences`
@@ -848,14 +1009,62 @@ Delete specific log entry (admin only).
 
 ### Getting Started
 
-#### 1. Sign Up / Log In
-- Navigate to `/login` or `/signup`
-- Create account with email and password
-- First user automatically becomes admin
+#### 1. Start in Demo Mode
+- Open the application - Demo mode is enabled by default
+- Explore all features without any setup or API costs
+- Demo data is simulated and stored in browser localStorage
 
-#### 2. Configure API Keys
+#### 2. Configure Your Database (When Ready for Production)
+- Click the **Demo** switch in the header to turn it OFF
+- You'll be redirected to the **"Setup Database"** page
+- **Alternatively**: Go to **Settings** → **Database** tab to configure at any time
+- Follow these steps:
+  1. **Create a Supabase project** (free at supabase.com)
+  2. **Copy credentials** from your Supabase dashboard:
+     - Project URL (Settings → API)
+     - anon/public key (Settings → API)
+  3. **Enter credentials** in the setup page or Settings → Database tab
+  4. **Click "Save"** (Settings page) or **"Save & Continue"** (setup page)
+  5. **Sign up** for your account
+- **Important**: Each user configures their own Supabase project. Your data stays completely private in your database!
+- **Export feature**: Admins can export settings (including Supabase config) to share with team members
+
+#### 3. Automatic Admin Assignment
+- The **first user** to sign up after configuring the database becomes **admin** + **approved** automatically
+- All subsequent users become **user** + **pending approval**
+- Pending users are redirected to "Account Pending" page and locked in Demo mode
+- Admins must approve users via **Users** page before they can access the system
+- Admins can access the **Logs** page for system monitoring
+
+#### 4. User Approval Workflow
+**For Administrators:**
+- Navigate to **Users** page (admin only, visible in sidebar)
+- View all users with their status (Pending/Approved) and role (Admin/User)
+- See alert when there are users pending approval
+- Click **Approve** button to grant system access to pending users
+- Promote trusted users to Admin role if needed
+- Demote admins to regular users if necessary (except yourself)
+- In Demo mode: Shows dummy data (1 admin + 3 users) to demonstrate workflow
+
+**For New Users:**
+1. Receive settings JSON from your administrator
+2. Import settings via **Settings** → **Import/Export** tab (file upload)
+3. Complete signup with your credentials
+4. You'll be redirected to **Account Pending** page
+5. Demo mode is locked ON - you cannot disable it
+6. See your account details and wait for administrator approval
+7. Once approved, log in again and disable Demo mode to access production features
+
+**Account Pending Page:**
+- Shows your email, full name, and registration date
+- Displays "Account Pending Approval" notice
+- Demo mode locked indicator
+- Logout button
+- Instructions to contact administrator
+
+#### 5. Configure Additional API Keys (Optional)
 - Go to **Settings** → **API Keys** tab
-- Enter API keys for services:
+- Enter API keys for services you want to use:
   - **Meta (Facebook/Instagram)**: Required for fetching content
   - **OpenRouter**: Required for AI contact extraction
   - **Mixedbread**: Required for embeddings
@@ -864,7 +1073,7 @@ Delete specific log entry (admin only).
 - Click **Save API Keys**
 - Use **Test** button to verify each API key
 
-#### 3. Create Source Audience
+#### 5. Create Source Audience
 - Navigate to **Source Audiences**
 - Click **+ Create Source Audience**
 - Enter:
@@ -875,14 +1084,14 @@ Delete specific log entry (admin only).
     - Instagram: profiles, media
 - Click **Create**
 
-#### 4. Extract Contacts
+#### 6. Extract Contacts
 - Select source audiences (checkboxes)
 - Click **Search** button in toolbar
 - Job starts immediately
 - Monitor progress in real-time
 - View results in **Shared Audiences**
 
-#### 5. Manage Contacts
+#### 7. Manage Contacts
 - Go to **Shared Audiences**
 - View extracted contacts in table
 - Use **Filters** to segment contacts
@@ -1037,6 +1246,8 @@ app/
 │   ├── signup/
 │   │   └── page.tsx
 │   └── layout.tsx
+├── account-pending/           # Pending users redirect
+│   └── page.tsx              # Account details + demo lock
 ├── (dashboard)/               # Authenticated routes
 │   ├── layout.tsx            # Dashboard layout with nav
 │   ├── page.tsx              # Redirect to /dashboard
@@ -1052,6 +1263,8 @@ app/
 │   │   └── page.tsx          # Filter builder
 │   ├── settings/
 │   │   └── page.tsx          # Configuration
+│   ├── users/
+│   │   └── page.tsx          # User management (admin)
 │   ├── logs/
 │   │   └── page.tsx          # Admin logs
 │   └── docs/
@@ -1156,8 +1369,24 @@ export async function middleware(request: NextRequest) {
   const supabase = createMiddlewareClient()
   const { data: { session } } = await supabase.auth.getSession()
 
+  // Redirect to login if not authenticated
   if (!session && !request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Redirect pending users to account-pending page
+  if (session) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('status')
+      .eq('id', session.user.id)
+      .single()
+
+    if (profile?.status === 'pending' && request.nextUrl.pathname !== '/account-pending') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/account-pending'
+      return NextResponse.redirect(url)
+    }
   }
 
   return NextResponse.next()
@@ -1292,7 +1521,9 @@ npm run build
 npm run start
 ```
 
-#### 2. Deploy to Vercel
+#### 2. Deploy to Vercel (Multi-Tenant)
+
+**Important**: Lume now uses a multi-tenant architecture where each user configures their own Supabase database. **No server-side credentials are needed!**
 
 ```bash
 # Install Vercel CLI
@@ -1301,14 +1532,18 @@ npm i -g vercel
 # Login
 vercel login
 
-# Deploy
+# Deploy (no environment variables needed!)
 vercel
+```
 
-# Set environment variables in Vercel dashboard
-# - All SUPABASE_* variables
-# - META_* variables
-# - External API keys
-# - ENCRYPTION_KEY
+**That's it!** Your app is now deployed. Users will configure their own databases when they exit Demo mode.
+
+**Optional**: If you want to use a shared Supabase instance for all users, you can set these environment variables in Vercel:
+```bash
+# Only needed if you want a shared database (not recommended for multi-tenant)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 #### 3. Configure Supabase
@@ -1341,14 +1576,16 @@ vercel
 
 ### Environment Variables Checklist
 
-**Required:**
+**Optional (Multi-Tenant Mode - Recommended):**
+- None! Users configure their own Supabase databases
+- Just deploy the code and you're done
+
+**Optional (Shared Database Mode):**
 - [ ] `NEXT_PUBLIC_SUPABASE_URL`
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`
-- [ ] `NEXT_PUBLIC_APP_URL`
-- [ ] `ENCRYPTION_KEY`
 
-**Optional (for production mode):**
+**Optional (for production mode - user-configured):**
 - [ ] `META_APP_ID`
 - [ ] `META_APP_SECRET`
 - [ ] `META_ACCESS_TOKEN`
@@ -1357,34 +1594,75 @@ vercel
 - [ ] `APOLLO_API_KEY`
 - [ ] `HUNTER_API_KEY`
 
+**Still Required:**
+- [ ] `NEXT_PUBLIC_APP_URL` (e.g., https://your-app.vercel.app)
+- [ ] `ENCRYPTION_KEY` (for encrypting API keys in browser localStorage)
+
 ### Post-Deployment
 
-**1. Verify Database**
-- Run migrations: `npx supabase db push`
-- Check tables created
-- Verify RLS policies
+**1. Test Demo Mode**
+- Open your deployed application
+- Verify Demo mode is ON by default
+- Test creating source audiences
+- Run a search job (simulated)
+- Verify everything works without any configuration
 
-**2. Test Authentication**
-- Sign up new account
-- Verify profile creation
-- Check admin assignment
+**2. Test Database Setup**
+- Click Demo switch to turn it OFF
+- Verify you're redirected to "Setup Database" page
+- Alternatively, go to **Settings** → **Database** tab
+- Test with invalid credentials (should show error)
+- Test with valid Supabase credentials (should succeed)
+- Verify you can sign up after database is configured
 
-**3. Test Demo Mode**
-- Enable demo mode
-- Create test source audience
-- Run search job
-- Verify simulated data
+**3. Test Admin Assignment & Approval System**
+- After configuring database, sign up as first user
+- Verify user becomes **admin** + **approved** automatically
+- Check that you can access /logs and /users pages
+- Sign up a second user (incognito window)
+- Verify second user is **user** + **pending** status
+- Verify second user is redirected to **Account Pending** page
+- Verify Account Pending page shows user details correctly
+- Verify second user is locked in Demo mode (cannot disable)
+- As admin, go to **Users** page and approve the second user
+- Verify second user can now access the system after approval
 
-**4. Configure Production APIs** (optional)
-- Add real API keys
-- Test each service
+**4. Test Demo Mode User Management**
+- Enable Demo mode
+- Go to **Users** page
+- Verify dummy data is shown (1 admin + 3 users)
+- Check that 2 users are pending approval
+- Test approval workflow with demo data
+- Verify UI behaves same as production mode
+
+**5. Test Settings Export/Import (File-Based)**
+- As admin, configure additional API keys in Settings
+- Export settings via **Settings** → **Import/Export** tab (downloads JSON file)
+- Verify export includes Supabase credentials
+- Import settings via file upload (not textarea)
+- Test importing in a different browser (simulating new user)
+- Verify all settings are imported correctly
+
+**5. Test Multi-Tenant Isolation** (optional)
+- Configure two different Supabase projects
+- Sign up with each in different browsers
+- Verify data is completely isolated
+- Check that users only see their own data
+
+**6. Test Production APIs** (optional)
+- Add real API keys in Settings
+- Test each service with Test button
 - Run small batch job
 - Verify costs tracked correctly
+- Monitor logs for errors
 
-**5. Monitor Logs**
-- Access /logs as admin
-- Check for errors
-- Verify all services working
+**7. Test Account Pending Page** (optional)
+- Sign up as new user in incognito window
+- Verify automatic redirect to /account-pending
+- Check that account details are displayed correctly
+- Verify Demo mode switch is disabled/locked
+- Test logout button
+- After admin approval, verify user can access full system
 
 ---
 
@@ -1453,6 +1731,23 @@ Proprietary - All rights reserved
 ---
 
 ## Changelog
+
+### Version 1.1.0 (January 2025) - Multi-Tenant Release
+- **Multi-tenant architecture**: Each user can configure their own Supabase database
+- **Zero server configuration**: Deploy on Vercel without any server-side credentials
+- **User avatar**: Shows first letter of user's name instead of generic "U"
+- **User approval system**: New users require admin approval before accessing the system
+- **Pending user lock**: Pending users are locked in Demo mode until approved
+- **Account Pending page**: Dedicated page for users awaiting approval with account details
+- **Database tab in Settings**: Dedicated tab for Supabase configuration with save confirmation
+- **Export includes Supabase**: Settings export now includes database credentials for team sharing
+- **File-based import**: Settings import uses file upload instead of textarea paste
+- **User management**: Admins can view, approve, and manage users with approval workflow
+- **Demo data in Users page**: Shows dummy data (1 admin + 3 users) when Demo mode is ON
+- **Middleware for pending users**: Automatic redirect to Account Pending page for pending users
+- **Updated documentation**: Comprehensive multi-tenant and approval system setup guide
+- **Client credentials**: Supabase client now uses user-configured credentials with fallback to env variables
+- **AlertDialog and Table components**: Added missing UI components for proper functionality
 
 ### Version 1.0.0 (January 2025)
 - Initial release

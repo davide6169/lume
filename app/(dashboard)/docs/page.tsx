@@ -21,6 +21,7 @@ import {
   Database,
   Shield,
   DollarSign,
+  Clock,
 } from 'lucide-react'
 
 export default function DocsPage() {
@@ -140,6 +141,98 @@ export default function DocsPage() {
                     </p>
                     <Badge variant="outline">Navigate to: Shared Audiences</Badge>
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Multi-Tenant Architecture</CardTitle>
+              <CardDescription>
+                How Lume works without server-side configuration
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Database className="h-5 w-5 text-blue-600" />
+                  <h4 className="font-semibold">Zero Server Configuration Required</h4>
+                  <Badge variant="secondary">Multi-Tenant</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    Lume is designed as a <strong>multi-tenant application</strong>. Each user can configure their own Supabase project, giving them complete data isolation and privacy.
+                  </p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• No server-side API keys needed for deployment</li>
+                    <li>• Each user has their own private database</li>
+                    <li>• Your deployment only needs the code - no credentials!</li>
+                    <li>• Users configure their own database in the app</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg bg-purple-50 dark:bg-purple-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-5 w-5 text-purple-600" />
+                  <h4 className="font-semibold">Demo Mode → Production Mode</h4>
+                  <Badge>Automatic Setup</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    Start immediately in <strong>Demo Mode</strong> without any setup. When you're ready to use real data:
+                  </p>
+                  <ol className="list-decimal space-y-1 ml-4">
+                    <li>Click the <strong>Demo</strong> switch to turn it OFF</li>
+                    <li>If you haven't configured a database, you'll see the "Setup Database" page</li>
+                    <li>Enter your Supabase URL and anon key</li>
+                    <li>That's it! You're now in Production Mode</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-5 w-5 text-green-600" />
+                  <h4 className="font-semibold">First User = Admin</h4>
+                  <Badge>Automatic</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    When you configure your database and sign up for the first time:
+                  </p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• First registered user: <strong>Admin role</strong> + <strong>Approved</strong></li>
+                    <li>• All subsequent users: <strong>User role</strong> + <strong>Pending Approval</strong></li>
+                    <li>• Admins must approve new users before they can access the system</li>
+                    <li>• Admins can view <strong>Logs</strong> page and manage users</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg bg-amber-50 dark:bg-amber-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-5 w-5 text-amber-600" />
+                  <h4 className="font-semibold">User Approval System</h4>
+                  <Badge variant="secondary">Security</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    New users require admin approval before accessing the system:
+                  </p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• <strong>Pending users</strong> are redirected to "Account Pending" page</li>
+                    <li>• <strong>Demo mode is locked ON</strong> for pending users</li>
+                    <li>• <strong>Admins approve users</strong> via the Users page (with demo data for testing)</li>
+                    <li>• <strong>Approved users</strong> can disable Demo mode and use the system</li>
+                  </ul>
+                  <div className="mt-3 p-2 bg-amber-100 dark:bg-amber-900 rounded text-xs">
+                    <strong>Account Pending Page:</strong> Shows user account details and instructs them to wait for admin approval. Includes logout functionality and clear notice about Demo mode being locked.
+                  </div>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                    ⚠️ This prevents unauthorized access to your database.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -314,6 +407,19 @@ export default function DocsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div>
+                  <h4 className="font-semibold mb-1">Database Configuration</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Configure your Supabase database connection:
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                    <li>• <strong>Supabase URL:</strong> Your project URL from Supabase dashboard</li>
+                    <li>• <strong>Supabase Anon Key:</strong> Your public/anon key from Supabase dashboard</li>
+                    <li>• <strong>Save Confirmation:</strong> Confirmation dialog validates inputs before saving</li>
+                    <li>• <strong>Multi-Tenant:</strong> Each user configures their own database</li>
+                  </ul>
+                </div>
+
+                <div className="border-t pt-3">
                   <h4 className="font-semibold mb-1">API Configuration</h4>
                   <p className="text-sm text-muted-foreground">
                     Add your API keys for production mode:
@@ -324,6 +430,18 @@ export default function DocsPage() {
                     <li>• <strong>Apollo.io:</strong> For contact enrichment</li>
                     <li>• <strong>Hunter.io:</strong> For email verification</li>
                     <li>• <strong>Meta GraphAPI:</strong> For Facebook/Instagram data</li>
+                  </ul>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-1">Import/Export Settings</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Share your configuration with team members:
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                    <li>• <strong>Export:</strong> Download all settings as JSON file (includes Supabase config)</li>
+                    <li>• <strong>Import:</strong> Upload JSON file to restore settings</li>
+                    <li>• <strong>Team Sharing:</strong> Admins can export config for new team members</li>
                   </ul>
                 </div>
 
@@ -361,6 +479,43 @@ export default function DocsPage() {
                 <p className="mt-2">
                   <Badge variant="secondary">Admin Only</Badge>
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Users</CardTitle>
+              <CardDescription>Manage users, roles, and approvals (admin only)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p><strong>User Management:</strong></p>
+                <ul className="list-disc list-inside space-y-1 ml-4">
+                  <li>View all users in your organization</li>
+                  <li>See user roles (admin/user) and status (pending/approved)</li>
+                  <li><strong>Approve pending users</strong> to grant system access</li>
+                  <li>Promote users to admin or demote admins to user</li>
+                  <li><strong>Demo Mode:</strong> Shows dummy data (1 admin + 3 users) for testing</li>
+                </ul>
+                <p className="mt-2">
+                  <Badge variant="secondary">Admin Only</Badge>
+                </p>
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                  <p className="text-xs">
+                    <strong>Approval System:</strong> New users sign up as "pending" and are locked in Demo mode until an admin approves them via this page.
+                  </p>
+                </div>
+                <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg">
+                  <p className="text-xs">
+                    <strong>Important:</strong> First user = admin + approved. All subsequent users = user + pending (must be approved).
+                  </p>
+                </div>
+                <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
+                  <p className="text-xs">
+                    <strong>Demo Mode Data:</strong> When Demo mode is ON, this page shows 4 dummy users (1 admin + 3 users with 2 pending) to demonstrate the approval workflow without real data.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -632,6 +787,93 @@ export default function DocsPage() {
                 <div className="flex items-start gap-2">
                   <CheckCircle className="h-4 w-4 mt-0.5 text-green-600" />
                   <p><strong>Meta Compliance:</strong> Follows Meta's Custom Audience requirements</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Getting Started with API Keys</CardTitle>
+              <CardDescription>Configure your own API credentials for production mode</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <h4 className="font-semibold">User-Configured API Keys</h4>
+                </div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Lume is designed so each user can configure their own API keys. Your deployment doesn't need any credentials on the server.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <h4 className="font-semibold mb-2">Step 1: Start in Demo Mode</h4>
+                  <p className="text-sm text-muted-foreground">
+                    When you first open Lume, it runs in <strong>Demo Mode</strong> with simulated data. You can explore all features without any setup or costs.
+                  </p>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-2">Step 2: Configure Your Database (Supabase)</h4>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p>To switch to production mode, click the <strong>Demo switch</strong> in the header to turn it OFF. You'll be prompted to configure your database:</p>
+                    <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li>Create a free project at <a href="https://supabase.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">supabase.com</a></li>
+                      <li>Copy your <strong>Project URL</strong> and <strong>anon/public key</strong> from Settings → API</li>
+                      <li>Enter them in the "Setup Database" page</li>
+                    </ul>
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 rounded text-xs">
+                      <strong>Important:</strong> Each user configures their own Supabase project. Your data stays in your database, completely private!
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-2">Step 3: Configure Additional API Keys</h4>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p>After configuring your database, navigate to <strong>Settings → API Keys</strong> to add more services:</p>
+                    <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li><strong>OpenRouter:</strong> Your API key for LLM extraction</li>
+                      <li><strong>Mixedbread:</strong> Your API key for embeddings</li>
+                      <li><strong>Apollo.io:</strong> Your API key for contact enrichment</li>
+                      <li><strong>Hunter.io:</strong> Your API key for email verification</li>
+                      <li><strong>Meta:</strong> Your app credentials for Facebook/Instagram</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-2">Step 4: Start Production Mode</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Once your database is configured, Demo mode turns OFF automatically and Lume will use your real database. Configure additional API keys as needed for specific features.
+                  </p>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-2">Security & Privacy</h4>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>✓ API keys are stored in your browser (encrypted)</p>
+                    <p>✓ Keys are never sent to any server except the intended API services</p>
+                    <p>✓ Each user has their own isolated configuration</p>
+                    <p>✓ Clearing browser data removes your API keys</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-2">Getting API Keys</h4>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p><strong>OpenRouter:</strong> Get key at <a href="https://openrouter.ai" target="_blank" rel="noopener" className="text-blue-600 hover:underline">openrouter.ai</a></p>
+                    <p><strong>Mixedbread:</strong> Get key at <a href="https://www.mixedbread.ai" target="_blank" rel="noopener" className="text-blue-600 hover:underline">mixedbread.ai</a></p>
+                    <p><strong>Apollo.io:</strong> Get key at <a href="https://www.apollo.io" target="_blank" rel="noopener" className="text-blue-600 hover:underline">apollo.io</a></p>
+                    <p><strong>Hunter.io:</strong> Get key at <a href="https://hunter.io" target="_blank" rel="noopener" className="text-blue-600 hover:underline">hunter.io</a></p>
+                    <p><strong>Meta:</strong> Create app at <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">developers.facebook.com</a></p>
+                    <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-950 rounded text-xs">
+                      <strong>Note:</strong> Supabase configuration is handled in Step 2 when you disable Demo mode.
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

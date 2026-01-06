@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useSettingsStore } from '@/lib/stores/useSettingsStore'
 import { useDemoStore } from '@/lib/stores/useDemoStore'
 import { Card } from '@/components/ui/card'
@@ -11,9 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText, Play, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText, Play, CheckCircle, XCircle, Loader2, Database } from 'lucide-react'
 import { getTestScenarios } from '@/lib/services/api-test-definitions'
 
 const apiServices = [
@@ -38,6 +37,8 @@ export default function SettingsPage() {
     removeApiKey,
     exportSettings,
     importSettings,
+    supabaseConfig,
+    setSupabaseConfig,
   } = useSettingsStore()
 
   // Wrapper functions to sync with database
@@ -57,10 +58,16 @@ export default function SettingsPage() {
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [tempKeys, setTempKeys] = useState(apiKeys)
-  const [importJson, setImportJson] = useState('')
   const [saveMessage, setSaveMessage] = useState('')
   const [exportDialog, setExportDialog] = useState(false)
   const [exportFileName, setExportFileName] = useState(`lume-settings-${new Date().toISOString().split('T')[0]}.json`)
+
+  // Supabase config state
+  const [tempSupabaseUrl, setTempSupabaseUrl] = useState(supabaseConfig.url)
+  const [tempSupabaseAnonKey, setTempSupabaseAnonKey] = useState(supabaseConfig.anonKey)
+
+  // Import file state
+  const importFileRef = React.useRef<HTMLInputElement>(null)
 
   // API Test states
   const [testDialog, setTestDialog] = useState<{
@@ -75,6 +82,7 @@ export default function SettingsPage() {
   // API Keys save confirmation dialog
   const [saveConfirmDialog, setSaveConfirmDialog] = useState(false)
   const [savedKeysCount, setSavedKeysCount] = useState(0)
+  const [savingType, setSavingType] = useState<'api-keys' | 'database'>('api-keys')
 
   const handleSaveKeys = () => {
     let count = 0
@@ -84,10 +92,57 @@ export default function SettingsPage() {
         count++
       }
     })
+
     setSavedKeysCount(count)
+    setSavingType('api-keys')
     setSaveConfirmDialog(true)
-    setSaveMessage('Settings saved successfully!')
+  }
+
+  const handleSaveSupabase = () => {
+    // Validate inputs
+    if (!tempSupabaseUrl.trim() || !tempSupabaseAnonKey.trim()) {
+      setSaveMessage('Error: Please fill in both Supabase URL and anon key')
+      setTimeout(() => setSaveMessage(''), 5000)
+      return
+    }
+
+    // Basic URL validation
+    if (!tempSupabaseUrl.startsWith('https://')) {
+      setSaveMessage('Error: Supabase URL must start with https://')
+      setTimeout(() => setSaveMessage(''), 5000)
+      return
+    }
+
+    // Save configuration
+    setSupabaseConfig(tempSupabaseUrl.trim(), tempSupabaseAnonKey.trim())
+    setSaveMessage('✅ Database configuration saved successfully!')
     setTimeout(() => setSaveMessage(''), 3000)
+  }
+
+  const handleSaveSupabaseWithConfirm = () => {
+    // Validate inputs first
+    if (!tempSupabaseUrl.trim() || !tempSupabaseAnonKey.trim()) {
+      setSaveMessage('Error: Please fill in both Supabase URL and anon key')
+      setTimeout(() => setSaveMessage(''), 5000)
+      return
+    }
+
+    // Show confirmation dialog
+    setSavingType('database')
+    setSaveConfirmDialog(true)
+  }
+
+  const confirmSave = () => {
+    if (savingType === 'database') {
+      handleSaveSupabase()
+    } else {
+      const count = savedKeysCount
+      if (count > 0) {
+        setSaveMessage(`✅ ${count === 1 ? '1 API key has' : `${count} API keys have`} been saved!`)
+        setTimeout(() => setSaveMessage(''), 3000)
+      }
+    }
+    setSaveConfirmDialog(false)
   }
 
   const handleExport = () => {
@@ -107,16 +162,28 @@ export default function SettingsPage() {
     setExportDialog(false)
   }
 
-  const handleImport = () => {
-    try {
-      const settings = JSON.parse(importJson)
-      importSettings(settings)
-      setImportJson('')
-      setSaveMessage('Settings imported successfully!')
-      setTimeout(() => setSaveMessage(''), 3000)
-    } catch {
-      setSaveMessage('Invalid JSON format')
-      setTimeout(() => setSaveMessage(''), 3000)
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const json = e.target?.result as string
+        const settings = JSON.parse(json)
+        importSettings(settings)
+        setSaveMessage('✅ Settings imported successfully!')
+        setTimeout(() => setSaveMessage(''), 3000)
+      } catch {
+        setSaveMessage('Error: Invalid JSON format')
+        setTimeout(() => setSaveMessage(''), 5000)
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset input
+    if (importFileRef.current) {
+      importFileRef.current.value = ''
     }
   }
 
@@ -203,12 +270,98 @@ export default function SettingsPage() {
         </Alert>
       )}
 
-      <Tabs defaultValue="api-keys" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="database" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="database">Database</TabsTrigger>
           <TabsTrigger value="api-keys">API Keys</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="import-export">Import/Export</TabsTrigger>
         </TabsList>
+
+        {/* Database Tab */}
+        <TabsContent value="database" className="space-y-6">
+          <Card className="p-6 space-y-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Database className="h-6 w-6 text-blue-600" />
+                <h2 className="text-xl font-semibold">Supabase Database Configuration</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Configure your Supabase project credentials to store and manage your data in production mode.
+              </p>
+            </div>
+
+            <Alert className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950">
+              <Database className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-sm">
+                <strong>Required for Production Mode:</strong> To use real data instead of demo mode, you need to configure your Supabase database.
+                Each user in your organization should use the same database credentials.
+              </AlertDescription>
+            </Alert>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="supabase-url">Project URL</Label>
+                <Input
+                  id="supabase-url"
+                  type="url"
+                  placeholder="https://your-project.supabase.co"
+                  value={tempSupabaseUrl}
+                  onChange={(e) => setTempSupabaseUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Found in your Supabase dashboard: Settings → API
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="supabase-anon-key">anon / public Key</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="supabase-anon-key"
+                    type={showKeys['supabase-anon'] ? 'text' : 'password'}
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    value={tempSupabaseAnonKey}
+                    onChange={(e) => setTempSupabaseAnonKey(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowKeys({ ...showKeys, 'supabase-anon': !showKeys['supabase-anon'] })}
+                  >
+                    {showKeys['supabase-anon'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Found in your Supabase dashboard: Settings → API
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t">
+              <h3 className="font-semibold mb-3">Need a Supabase Project?</h3>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>If you don't have a Supabase project yet:</p>
+                <ol className="list-decimal list-inside space-y-1 ml-4">
+                  <li>Go to <a href="https://supabase.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">supabase.com</a> and create a free account</li>
+                  <li>Create a new project (takes about 2 minutes)</li>
+                  <li>Go to Settings → API in your project dashboard</li>
+                  <li>Copy the Project URL and anon/public key</li>
+                  <li>Paste them above and click "Save Database Configuration"</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="pt-4 border-t">
+              <Button onClick={handleSaveSupabaseWithConfirm} className="w-full" size="lg">
+                <Save className="h-4 w-4 mr-2" />
+                Save Database Configuration
+              </Button>
+            </div>
+          </Card>
+        </TabsContent>
 
         {/* API Keys Tab */}
         <TabsContent value="api-keys" className="space-y-6">
@@ -382,19 +535,27 @@ export default function SettingsPage() {
               <div className="border-t pt-4">
                 <Label>Import Settings</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Paste your settings JSON below to import
+                  Upload a settings JSON file to import your configuration
                 </p>
-                <Textarea
-                  placeholder='{"demoMode": true, "selectedLlmModel": "mistral-7b-instruct:free", ...}'
-                  value={importJson}
-                  onChange={(e) => setImportJson(e.target.value)}
-                  rows={6}
-                  className="mb-2"
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImport}
+                  className="hidden"
+                  id="import-settings-file"
                 />
-                <Button onClick={handleImport} variant="outline" className="w-full" disabled={!importJson.trim()}>
+                <Button
+                  onClick={() => importFileRef.current?.click()}
+                  variant="outline"
+                  className="w-full"
+                >
                   <Upload className="mr-2 h-4 w-4" />
-                  Import Settings
+                  Import Settings from File
                 </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Select a JSON file previously exported from Lume
+                </p>
               </div>
             </div>
           </Card>
@@ -547,35 +708,54 @@ export default function SettingsPage() {
         </Dialog>
       )}
 
-      {/* API Keys Save Confirmation Dialog */}
+      {/* Save Confirmation Dialog */}
       <Dialog open={saveConfirmDialog} onOpenChange={setSaveConfirmDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              API Keys Saved Successfully
+              {savingType === 'database' ? 'Save Database Configuration' : 'Save API Keys'}
             </DialogTitle>
             <DialogDescription>
-              {savedKeysCount === 1
-                ? '1 API key has been saved to your browser storage.'
-                : `${savedKeysCount} API keys have been saved to your browser storage.`
+              {savingType === 'database'
+                ? 'Are you sure you want to save your Supabase database configuration? This will update your connection settings.'
+                : (savedKeysCount === 1
+                  ? '1 API key will be saved to your browser storage.'
+                  : `${savedKeysCount} API keys will be saved to your browser storage.`
+                )
               }
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            <Alert className="bg-green-50 dark:bg-green-950 border-green-500">
-              <AlertCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-sm">
-                Your API keys are stored locally in your browser and will be used for all API calls.
-                Keys are never sent to the server.
-              </AlertDescription>
-            </Alert>
-          </div>
+          {savingType === 'database' ? (
+            <div className="py-4">
+              <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-500">
+                <Database className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-sm">
+                  Your database credentials will be stored locally in your browser and used to connect to your Supabase project.
+                  Credentials are never sent to the server.
+                </AlertDescription>
+              </Alert>
+            </div>
+          ) : (
+            <div className="py-4">
+              <Alert className="bg-green-50 dark:bg-green-950 border-green-500">
+                <AlertCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-sm">
+                  Your API keys are stored locally in your browser and will be used for all API calls.
+                  Keys are never sent to the server.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
 
           <DialogFooter>
-            <Button onClick={() => setSaveConfirmDialog(false)}>
-              Done
+            <Button variant="outline" onClick={() => setSaveConfirmDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSave}>
+              <Save className="mr-2 h-4 w-4" />
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

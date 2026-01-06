@@ -1,12 +1,16 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { publicEnv, serverEnv, hasRealApiKeys } from '@/lib/config/env'
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies()
 
+  // NOTE: Server-side client always uses environment variables
+  // This is intentional - user-configured credentials are only used client-side
+  // Server-side auth (login/signup) needs a shared Supabase instance
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    publicEnv.supabaseUrl,
+    publicEnv.supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -31,9 +35,11 @@ export async function createSupabaseServerClient() {
 export async function createSupabaseServiceClient() {
   const cookieStore = await cookies()
 
+  // NOTE: Service client always uses environment variables
+  // Used for admin operations that need to bypass RLS
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    publicEnv.supabaseUrl,
+    serverEnv.supabaseServiceKey,
     {
       cookies: {
         getAll() {
@@ -54,3 +60,9 @@ export async function createSupabaseServiceClient() {
   )
 }
 
+/**
+ * Check if Supabase is properly configured
+ */
+export function isSupabaseConfigured(): boolean {
+  return hasRealApiKeys()
+}

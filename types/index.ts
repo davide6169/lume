@@ -11,6 +11,7 @@ export interface Profile {
   email: string;
   fullName?: string;
   role: 'admin' | 'user';
+  status: 'pending' | 'approved';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -210,6 +211,10 @@ export interface ExportableSettings {
   logsEnabled?: boolean;
   selectedLlmModel?: string;
   selectedEmbeddingModel?: string;
+  supabaseConfig?: {
+    url: string;
+    anonKey: string;
+  };
 }
 
 export interface ExportableSourceAudiences {

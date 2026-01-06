@@ -31,6 +31,15 @@ interface SettingsState {
   setApiKey: (service: keyof SettingsState['apiKeys'], key: string) => void
   removeApiKey: (service: keyof SettingsState['apiKeys']) => void
 
+  // Supabase user configuration (for multi-tenant setup)
+  supabaseConfig: {
+    url: string
+    anonKey: string
+  }
+  setSupabaseConfig: (url: string, anonKey: string) => void
+  clearSupabaseConfig: () => void
+  hasUserSupabaseConfig: () => boolean
+
   // Import/Export
   exportSettings: () => ExportableSettings
   importSettings: (settings: ExportableSettings) => void
@@ -49,6 +58,10 @@ const defaultSettings = {
   selectedLlmModel: 'mistral-7b-instruct:free',
   selectedEmbeddingModel: 'mxbai-embed-large-v1',
   apiKeys: {},
+  supabaseConfig: {
+    url: '',
+    anonKey: '',
+  },
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -83,14 +96,41 @@ export const useSettingsStore = create<SettingsState>()(
           return { apiKeys: newKeys }
         }),
 
+      setSupabaseConfig: (url, anonKey) =>
+        set((state) => ({
+          supabaseConfig: {
+            url: url.trim(),
+            anonKey: anonKey.trim(),
+          },
+        })),
+
+      clearSupabaseConfig: () =>
+        set((state) => ({
+          supabaseConfig: {
+            url: '',
+            anonKey: '',
+          },
+        })),
+
+      hasUserSupabaseConfig: () => {
+        const { supabaseConfig } = get()
+        return (
+          supabaseConfig.url !== '' &&
+          supabaseConfig.anonKey !== '' &&
+          !supabaseConfig.url.includes('your-project') &&
+          !supabaseConfig.anonKey.includes('your-anon-key')
+        )
+      },
+
       exportSettings: () => {
-        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel } = get()
+        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig } = get()
         return {
           apiKeys,
           demoMode,
           logsEnabled,
           selectedLlmModel,
           selectedEmbeddingModel,
+          supabaseConfig,
         }
       },
 
@@ -101,6 +141,7 @@ export const useSettingsStore = create<SettingsState>()(
           logsEnabled: settings.logsEnabled ?? (settings.demoMode ?? true), // Default based on demo mode
           selectedLlmModel: settings.selectedLlmModel || 'mistral-7b-instruct:free',
           selectedEmbeddingModel: settings.selectedEmbeddingModel || 'mxbai-embed-large-v1',
+          supabaseConfig: settings.supabaseConfig || { url: '', anonKey: '' },
         })
       },
 
