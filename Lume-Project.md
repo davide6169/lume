@@ -10,6 +10,8 @@
 - [API Endpoints](#api-endpoints)
 - [User Guide](#user-guide)
 - [Development Guide](#development-guide)
+  - [Git Workflow & Branch Strategy](#git-workflow--branch-strategy)
+  - [Project Structure Deep Dive](#project-structure-deep-dive)
 - [Deployment](#deployment)
 
 ---
@@ -1254,6 +1256,205 @@ npx supabase db push
 
 # Or manually run SQL files
 psql -h db.project.supabase.co -U postgres -d postgres < supabase/migrations/001_initial_schema.sql
+```
+
+### Git Workflow & Branch Strategy
+
+**Lume uses a simplified Git flow with preview deployments:**
+
+#### Branch Structure
+
+```
+main (Production)
+├── Stable, tested code only
+├── Deployed to Vercel Production
+└── Direct commits allowed for hotfixes
+
+develop (Development)
+├── Active development branch
+├── Deployed to Vercel Preview
+└── Merged into main when stable
+
+feature/* (Optional)
+├── Feature-specific branches
+├── Created from develop
+└── Merged back into develop
+```
+
+#### Daily Development Workflow
+
+**1. Development on `develop` branch:**
+
+```bash
+# Start from develop
+git checkout develop
+
+# Make your changes
+# ... edit files ...
+
+# Test locally
+npm run dev
+# Test at http://localhost:3000
+
+# Commit changes
+git add .
+git commit -m "feat: add new feature"
+
+# Push to develop
+git push origin develop
+```
+
+**Vercel automatically creates a Preview deployment:**
+- URL: `https://lume-git-develop-davide6169.vercel.app`
+- Test all changes before production
+
+**2. Merge to Production when stable:**
+
+```bash
+# Switch to main
+git checkout main
+
+# Pull latest changes
+git pull origin main
+
+# Merge develop
+git merge develop
+
+# Push to production
+git push origin main
+```
+
+**Vercel automatically deploys to Production**
+
+#### Feature Branch Workflow (Optional)
+
+For complex features requiring multiple days:
+
+```bash
+# Create feature branch from develop
+git checkout develop
+git checkout -b feature/user-authentication
+
+# Work on feature
+git add .
+git commit -m "feat: add login page"
+git push origin feature/user-authentication
+
+# When complete, merge back to develop
+git checkout develop
+git merge feature/user-authentication
+git push origin develop
+
+# Delete feature branch
+git branch -d feature/user-authentication
+git push origin --delete feature/user-authentication
+```
+
+#### Vercel Integration
+
+**Production Settings:**
+- **Repository**: `davide6169/lume` (NOT lume-app)
+- **Production Branch**: `main`
+- **Preview Branches**: All other branches
+
+**Automatic Deployments:**
+- Push to `main` → Production deployment
+- Push to `develop` → Preview deployment
+- Push to `feature/*` → Preview deployment
+
+**Environment Variables:**
+- Configure separately for Production and Preview
+- Use different API keys for testing if needed
+
+#### Commit Message Conventions
+
+```bash
+feat:     New feature
+fix:      Bug fix
+docs:     Documentation only changes
+style:    Code style changes (formatting)
+refactor: Code refactoring
+test:     Adding or updating tests
+chore:    Maintenance tasks
+perf:     Performance improvements
+security: Security fixes
+```
+
+**Examples:**
+```bash
+git commit -m "feat: add Meta Custom Audiences upload"
+git commit -m "fix: resolve race condition in job processor"
+git commit -m "docs: update API endpoint documentation"
+git commit -m "security: implement AES-256 encryption for API keys"
+```
+
+#### Useful Git Commands
+
+```bash
+# Check branch status
+git status
+git branch -a
+git log --oneline --graph --all
+
+# Sync with remote
+git fetch origin
+git pull origin main
+git pull origin develop
+
+# Undo changes
+git checkout -- <file>           # Undo local changes
+git reset HEAD <file>            # Unstage file
+git reset --soft HEAD~1          # Undo last commit (keep changes)
+git reset --hard HEAD~1          # Undo last commit (lose changes)
+
+# Resolve merge conflicts
+git status                       # See conflicts
+# Edit conflicted files (search for <<<<<<<)
+git add <resolved-file>          # Mark as resolved
+git commit                       # Complete merge
+
+# View differences
+git diff                         # Unstaged changes
+git diff --staged                # Staged changes
+git diff main                    # Compare with main
+```
+
+#### Common Workflows
+
+**Hotfix Production:**
+
+```bash
+# Fix critical bug on main
+git checkout main
+# Make fix
+git add .
+git commit -m "fix: critical production bug"
+git push origin main
+
+# Don't forget to merge back to develop
+git checkout develop
+git merge main
+git push origin develop
+```
+
+**Sync After Main Update:**
+
+```bash
+# If main was updated, sync develop
+git checkout develop
+git pull origin main
+# Resolve conflicts if any
+git push origin develop
+```
+
+**Clean Up Local Branches:**
+
+```bash
+# Delete merged local branches
+git branch --merged | grep -v "main" | grep -v "develop" | xargs git branch -d
+
+# Prune remote branches
+git remote prune origin
 ```
 
 ### Project Structure Deep Dive
