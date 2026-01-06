@@ -210,27 +210,21 @@ export async function updateUserRole(
   userId: string,
   newRole: 'admin' | 'user'
 ) {
+  // First, get the current role
+  const { data: currentUser, error: fetchError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single()
+
+  if (fetchError) throw fetchError
+  const previousRole = currentUser.role
+
   return executeTransaction(
     [
       {
-        name: 'get_current_role',
-        execute: async () => {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', userId)
-            .single()
-
-          if (error) throw error
-          return data.role
-        },
-        rollback: async () => {
-          // No rollback needed for read operation
-        },
-      },
-      {
         name: 'update_role',
-        execute: async (previousResult) => {
+        execute: async () => {
           const { data, error } = await supabase
             .from('profiles')
             .update({ role: newRole })
@@ -239,7 +233,7 @@ export async function updateUserRole(
             .single()
 
           if (error) throw error
-          return { previousRole: previousResult, newRole }
+          return { previousRole, newRole, data }
         },
         rollback: async (result) => {
           // Revert to previous role
