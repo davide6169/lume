@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 
 export async function login(formData: FormData) {
   const supabase = await createSupabaseServerClient()
@@ -49,11 +50,25 @@ export async function signup(formData: FormData) {
   redirect('/')
 }
 
+/**
+ * Logout with complete session cleanup
+ * This is a server action, but it signals to the client to clean up localStorage
+ */
 export async function logout() {
   const supabase = await createSupabaseServerClient()
 
+  // Sign out from Supabase
   await supabase.auth.signOut()
 
+  // Clear all cookies
+  const cookieStore = await cookies()
+  const allCookies = cookieStore.getAll()
+
+  for (const cookie of allCookies) {
+    cookieStore.delete(cookie.name)
+  }
+
+  // Revalidate and redirect
   revalidatePath('/', 'layout')
-  redirect('/login')
+  redirect('/login?loggedOut=true')
 }

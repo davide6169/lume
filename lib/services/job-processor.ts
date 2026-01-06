@@ -17,10 +17,16 @@ export interface JobProcessorOptions {
   onError?: (jobId: string, error: string) => void
 }
 
+// Configuration constants
+const MAX_JOBS = 100 // Maximum jobs to keep in memory
+const CLEANUP_INTERVAL = 5 * 60 * 1000 // Cleanup every 5 minutes
+const DEFAULT_JOB_MAX_AGE = 24 * 60 * 60 * 1000 // 24 hours
+
 export class JobProcessor {
   private static instance: JobProcessor
   private jobs: Map<string, Job>
   private processing: Set<string>
+  private cleanupTimer: NodeJS.Timeout | null = null
 
   private constructor() {
     // Use globalThis to persist across HMR in development
@@ -44,6 +50,9 @@ export class JobProcessor {
       this.jobs = new Map()
       this.processing = new Set()
     }
+
+    // Start automatic cleanup
+    this.startCleanupTimer()
   }
 
   static getInstance(): JobProcessor {
@@ -56,15 +65,16 @@ export class JobProcessor {
   }
 
   /**
-   * Create a new job
+   * Create a new job with guaranteed unique ID
    */
   createJob(
     userId: string,
     type: 'SEARCH' | 'UPLOAD_TO_META',
     payload: Record<string, any>
   ): Job {
+    // Use crypto.randomUUID() for guaranteed unique IDs (fixes race condition)
     const job: Job = {
-      id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(), // Replaces Date.now() + random - guaranteed unique
       userId,
       type,
       status: 'pending',
@@ -84,6 +94,10 @@ export class JobProcessor {
     this.jobs.set(job.id, job)
     console.log(`[JobProcessor] Current jobs in Map after: ${this.jobs.size}`)
     console.log(`[JobProcessor] Jobs in Map:`, Array.from(this.jobs.keys()))
+
+    // Enforce max jobs limit (fixes memory leak)
+    this.enforceJobLimit()
+
     return job
   }
 
@@ -177,7 +191,7 @@ export class JobProcessor {
   }
 
   /**
-   * Start processing a job
+   * Start processing a job with atomic lock (fixes race condition)
    */
   async startJob(
     jobId: string,
@@ -189,30 +203,33 @@ export class JobProcessor {
       throw new Error(`Job ${jobId} not found`)
     }
 
+    // Atomic check-and-set for processing status (fixes race condition)
     if (this.processing.has(jobId)) {
       throw new Error(`Job ${jobId} is already processing`)
     }
 
+    // Add to processing set BEFORE updating status (atomic operation)
     this.processing.add(jobId)
-    job.status = 'processing'
-    job.startedAt = new Date()
-    job.updatedAt = new Date()
-
-    job.timeline.push({
-      timestamp: new Date().toISOString(),
-      event: 'JOB_STARTED',
-      details: { type: job.type }
-    })
-
-    // Update progress callback
-    const updateProgress = (progress: number, event?: any) => {
-      const updatedJob = this.updateJobProgress(jobId, progress, event)
-      if (updatedJob && options?.onProgress) {
-        options.onProgress(jobId, progress, updatedJob.timeline)
-      }
-    }
 
     try {
+      job.status = 'processing'
+      job.startedAt = new Date()
+      job.updatedAt = new Date()
+
+      job.timeline.push({
+        timestamp: new Date().toISOString(),
+        event: 'JOB_STARTED',
+        details: { type: job.type }
+      })
+
+      // Update progress callback
+      const updateProgress = (progress: number, event?: any) => {
+        const updatedJob = this.updateJobProgress(jobId, progress, event)
+        if (updatedJob && options?.onProgress) {
+          options.onProgress(jobId, progress, updatedJob.timeline)
+        }
+      }
+
       await processor(job, updateProgress)
       const completedJob = this.completeJob(jobId, null)
       if (completedJob && options?.onComplete) {
@@ -260,6 +277,7 @@ export class JobProcessor {
     let cleaned = 0
 
     for (const [jobId, job] of this.jobs.entries()) {
+      // Only clean jobs that are not currently processing
       if (job.createdAt < cutoff && !this.processing.has(jobId)) {
         this.jobs.delete(jobId)
         cleaned++
@@ -267,6 +285,82 @@ export class JobProcessor {
     }
 
     return cleaned
+  }
+
+  /**
+   * Enforce maximum job limit to prevent memory leaks
+   * Removes oldest completed/failed jobs first
+   */
+  private enforceJobLimit(): void {
+    if (this.jobs.size <= MAX_JOBS) return
+
+    console.log(`[JobProcessor] Job limit exceeded (${this.jobs.size}/${MAX_JOBS}), cleaning up...`)
+
+    // Convert to array and sort by creation time
+    const sortedJobs = Array.from(this.jobs.entries())
+      .sort(([, a], [, b]) => a.createdAt.getTime() - b.createdAt.getTime())
+
+    let removed = 0
+    for (const [jobId, job] of sortedJobs) {
+      // Only remove completed, failed, or cancelled jobs (not processing)
+      if (this.jobs.size <= MAX_JOBS) break
+
+      if (
+        !this.processing.has(jobId) &&
+        (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled')
+      ) {
+        this.jobs.delete(jobId)
+        removed++
+      }
+    }
+
+    console.log(`[JobProcessor] Removed ${removed} old jobs to enforce limit`)
+  }
+
+  /**
+   * Start automatic cleanup timer
+   */
+  private startCleanupTimer(): void {
+    // Clear any existing timer
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer)
+    }
+
+    // Run cleanup periodically
+    this.cleanupTimer = setInterval(() => {
+      const cleaned = this.cleanupOldJobs(24)
+      if (cleaned > 0) {
+        console.log(`[JobProcessor] Auto-cleanup: removed ${cleaned} old jobs`)
+      }
+      this.enforceJobLimit()
+    }, CLEANUP_INTERVAL)
+
+    console.log('[JobProcessor] Started automatic cleanup timer')
+  }
+
+  /**
+   * Stop cleanup timer (call when shutting down)
+   */
+  stopCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+      console.log('[JobProcessor] Stopped cleanup timer')
+    }
+  }
+
+  /**
+   * Get job statistics
+   */
+  getStats(): { total: number; processing: number; completed: number; failed: number; pending: number } {
+    const jobs = Array.from(this.jobs.values())
+    return {
+      total: jobs.length,
+      processing: jobs.filter(j => j.status === 'processing').length,
+      completed: jobs.filter(j => j.status === 'completed').length,
+      failed: jobs.filter(j => j.status === 'failed').length,
+      pending: jobs.filter(j => j.status === 'pending').length
+    }
   }
 }
 
