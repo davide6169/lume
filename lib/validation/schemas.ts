@@ -203,11 +203,11 @@ export function validateRequestBody<T>(schema: z.ZodSchema<T>, body: unknown): {
 /**
  * Format Zod error for API response
  */
-export function formatZodError(error: z.ZodError): {
+export function formatZodError(error: z.ZodError<any>): {
   field: string
   message: string
 }[] {
-  return error.errors.map((err) => ({
+  return error.issues.map((err) => ({
     field: err.path.join('.'),
     message: err.message,
   }))
