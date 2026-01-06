@@ -122,7 +122,16 @@
 - **Client-Side Encryption**: Industry-standard CryptoJS AES encryption
 - **Transparent Migration**: Automatically handles both encrypted and legacy data
 
-### 10. System Logging
+### 10. Performance & Reliability (v1.1.2+)
+- **Race Condition Prevention**: UUID-based job IDs, atomic processing locks
+- **Memory Leak Prevention**: Auto-cleanup timers, max job limits, memory monitoring
+- **Request Timeouts**: 30s default timeout, 5min for long-running operations
+- **Retry Logic**: Exponential backoff for failed API requests
+- **Session Management**: Complete logout cleanup, localStorage/sessionStorage clearing
+- **Database Transactions**: Compensating transactions with automatic rollback
+- **Resource Monitoring**: Job statistics, storage usage tracking
+
+### 11. System Logging
 - **Admin-Only Access**: Comprehensive system logs for administrators
 - **Multiple Log Levels**: info, warn, error, debug
 - **Detailed Metadata**: Request/response data for API calls
@@ -1744,6 +1753,32 @@ Proprietary - All rights reserved
 ---
 
 ## Changelog
+
+### Version 1.1.2 (January 2026) - Performance & Reliability Release ⚡
+- **Race Condition Prevention**: Job IDs now use crypto.randomUUID() instead of Date.now() + random
+- **Atomic Processing Locks**: Jobs added to processing set BEFORE status update (no concurrent execution)
+- **Memory Leak Prevention**: Auto-cleanup every 5 minutes, MAX_JOBS limit (100), enforceJobLimit()
+- **Request Timeouts**: All fetch calls have 30s timeout with AbortController, 5min for long jobs
+- **Retry Logic**: fetchWithRetry() with exponential backoff for failed requests
+- **Session Cleanup**: Complete logout clears all cookies, localStorage, and sessionStorage
+- **Database Transactions**: Compensating transaction pattern with automatic rollback on failure
+- **Resource Monitoring**: getStats() for jobs, getStorageStats() for localStorage usage
+
+**New Utilities**:
+- `lib/utils/fetch.ts`: fetchWithTimeout(), fetchWithRetry(), apiClient, longRunningClient
+- `lib/utils/session.ts`: cleanupSession(), clearAppData(), getStorageStats(), safeLocalStorage
+- `lib/utils/transactions.ts`: executeTransaction(), createSourceAudienceWithCost(), approveUser()
+
+**Performance Improvements**:
+- Jobs no longer fail due to duplicate IDs
+- Memory usage controlled with automatic cleanup
+- Network issues don't hang the application
+- Proper resource cleanup on logout
+- Database operations maintain consistency
+
+**Backward Compatibility**:
+- All changes are backward compatible
+- Existing code continues to work without modifications
 
 ### Version 1.1.1 (January 2026) - Security Hardening Release 🔒
 - **CRITICAL: Authentication Bypass Fix**: Removed demo mode auth bypass vulnerability (middleware.ts)

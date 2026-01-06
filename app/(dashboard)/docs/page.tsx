@@ -239,7 +239,7 @@ export default function DocsPage() {
               <div className="p-4 border rounded-lg bg-red-50 dark:bg-red-950">
                 <div className="flex items-center gap-2 mb-2">
                   <Shield className="h-5 w-5 text-red-600" />
-                  <h4 className="font-semibold">Security Features (v1.1.0+)</h4>
+                  <h4 className="font-semibold">Security Features (v1.1.1+)</h4>
                   <Badge variant="destructive">Critical Updates</Badge>
                 </div>
                 <div className="text-sm text-muted-foreground space-y-2">
@@ -258,6 +258,32 @@ export default function DocsPage() {
                   </div>
                   <p className="text-xs text-red-700 dark:text-red-300 mt-2">
                     🔒 All sensitive data is now encrypted at rest in localStorage using industry-standard encryption.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="h-5 w-5 text-blue-600" />
+                  <h4 className="font-semibold">Performance & Reliability (v1.1.2+)</h4>
+                  <Badge variant="default">High Priority Fixes</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    Critical fixes for stability, performance, and data consistency:
+                  </p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• <strong>Race Condition Prevention</strong> - Guaranteed unique job IDs with UUID, atomic processing locks</li>
+                    <li>• <strong>Memory Leak Prevention</strong> - Auto-cleanup, 100 job limit, 5-minute cleanup intervals</li>
+                    <li>• <strong>Request Timeouts</strong> - All API calls have 30s timeout (5min for long jobs)</li>
+                    <li>• <strong>Session Management</strong> - Complete logout cleanup, proper localStorage/sessionStorage clearing</li>
+                    <li>• <strong>Database Transactions</strong> - Multi-step operations with automatic rollback on failure</li>
+                  </ul>
+                  <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
+                    <strong>Reliability Improvements:</strong> Jobs no longer fail due to duplicate IDs, memory usage is controlled, network issues don't hang the app, logout properly cleans up all data, and database operations maintain consistency.
+                  </div>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                    ⚡ Significantly improved application stability and resource management.
                   </p>
                 </div>
               </div>
