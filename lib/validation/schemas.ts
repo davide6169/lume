@@ -23,16 +23,12 @@ export const nonEmptyStringSchema = z.string().min(1, 'This field is required')
 
 export const updateUserRoleSchema = z.object({
   userId: uuidSchema,
-  role: z.enum(['admin', 'user'], {
-    errorMap: () => ({ message: 'Role must be either "admin" or "user"' }),
-  }),
+  role: z.enum(['admin', 'user']),
 })
 
 export const updateUserStatusSchema = z.object({
   userId: uuidSchema,
-  status: z.enum(['pending', 'approved'], {
-    errorMap: () => ({ message: 'Status must be either "pending" or "approved"' }),
-  }),
+  status: z.enum(['pending', 'approved']),
 })
 
 export const updateUserSchema = z.discriminatedUnion('field', [
@@ -65,9 +61,7 @@ export const saveSettingsSchema = z.object({
 
 export const createSourceAudienceSchema = z.object({
   name: nonEmptyStringSchema.max(100, 'Name must be less than 100 characters'),
-  type: z.enum(['facebook', 'instagram'], {
-    errorMap: () => ({ message: 'Type must be either "facebook" or "instagram"' }),
-  }),
+  type: z.enum(['facebook', 'instagram']),
   urls: z
     .array(z.string().url('Each URL must be valid'))
     .min(1, 'At least one URL is required')
