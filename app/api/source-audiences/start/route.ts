@@ -7,7 +7,7 @@ import { ApolloEnrichmentStubService } from '@/lib/services/apollo-enrichment-st
 import { createHunterIoService } from '@/lib/services/hunter-io'
 import { createOpenRouterService } from '@/lib/services/openrouter'
 import { createMixedbreadService } from '@/lib/services/mixedbread'
-import { MetaGraphAPIService } from '@/lib/services/meta-graphapi'
+import { ApifyScraperService } from '@/lib/services/apify-scraper'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -614,82 +614,82 @@ async function processSearchJob(jobId: string, userId: string) {
 
         const apiKeys = job.payload.apiKeys
 
-        // Initialize Meta GraphAPI production service if API key available
-        if (apiKeys?.meta) {
-          const metaService = new MetaGraphAPIService(apiKeys.meta)
-          console.log('[JobProcessor] Meta GraphAPI production service initialized')
+        // Initialize Apify production service if API key available
+        if (apiKeys?.apify) {
+          const apifyService = new ApifyScraperService(apiKeys.apify)
+          console.log('[JobProcessor] Apify production service initialized')
 
           // Validate token
           update(10, {
             timestamp: new Date().toISOString(),
-            event: 'META_TOKEN_VALIDATION_STARTED',
+            event: 'APIFY_TOKEN_VALIDATION_STARTED',
             details: {
-              provider: 'Meta GraphAPI',
-              task: 'Validate access token'
+              provider: 'Apify',
+              task: 'Validate API token'
             }
           })
 
           try {
-            const tokenValidation = await metaService.validateToken()
+            const tokenValidation = await apifyService.validateToken()
 
             if (tokenValidation.valid) {
-              console.log('[JobProcessor] Meta token valid:', tokenValidation.appName)
+              console.log('[JobProcessor] Apify token valid:', tokenValidation.appName)
 
               update(15, {
                 timestamp: new Date().toISOString(),
-                event: 'META_TOKEN_VALIDATED',
+                event: 'APIFY_TOKEN_VALIDATED',
                 details: {
-                  provider: 'Meta GraphAPI',
-                  appName: tokenValidation.appName || 'Unknown App',
+                  provider: 'Apify',
+                  appName: tokenValidation.appName || 'Apify',
                   status: 'valid'
                 }
               })
             } else {
-              console.error('[JobProcessor] Meta token invalid:', tokenValidation.error)
+              console.error('[JobProcessor] Apify token invalid:', tokenValidation.error)
 
               update(15, {
                 timestamp: new Date().toISOString(),
-                event: 'META_TOKEN_INVALID',
+                event: 'APIFY_TOKEN_INVALID',
                 details: {
-                  provider: 'Meta GraphAPI',
+                  provider: 'Apify',
                   error: tokenValidation.error
                 }
               })
 
-              throw new Error(`Meta token validation failed: ${tokenValidation.error}`)
+              throw new Error(`Apify token validation failed: ${tokenValidation.error}`)
             }
           } catch (error) {
-            console.error('[JobProcessor] Exception during Meta token validation:', error)
+            console.error('[JobProcessor] Exception during Apify token validation:', error)
             throw error
           }
 
-          // Demonstrate Facebook post fetching
+          // Demonstrate Facebook post fetching with Apify
           const sampleFacebookUrl = 'https://www.facebook.com/20531316728/posts/10158264921766728/'
 
           update(20, {
             timestamp: new Date().toISOString(),
-            event: 'META_FETCH_STARTED',
+            event: 'APIFY_FETCH_STARTED',
             details: {
-              provider: 'Meta GraphAPI',
+              provider: 'Apify',
               platform: 'Facebook',
               url: sampleFacebookUrl
             }
           })
 
           try {
-            const parsedUrl = metaService.parseUrl(sampleFacebookUrl)
+            const parsedUrl = apifyService.parseUrl(sampleFacebookUrl)
             console.log('[JobProcessor] Parsed Facebook URL:', parsedUrl)
 
-            // Fetch comments from the post
-            const comments = await metaService.fetchFacebookComments(parsedUrl.id, { limit: 10 })
+            // Fetch comments from the post using Apify
+            const comments = await apifyService.fetchFacebookComments(parsedUrl.id, { limit: 10 })
 
             console.log('[JobProcessor] Fetched Facebook comments:', comments.length)
 
             update(25, {
               timestamp: new Date().toISOString(),
-              event: 'META_FETCH_COMPLETED',
+              event: 'APIFY_FETCH_COMPLETED',
               details: {
-                provider: 'Meta GraphAPI',
+                provider: 'Apify',
                 platform: 'Facebook',
                 resourceType: 'post comments',
                 commentsFetched: comments.length,
@@ -700,18 +700,19 @@ async function processSearchJob(jobId: string, userId: string) {
               }
             })
           } catch (error) {
-            console.error('[JobProcessor] Exception during Meta GraphAPI fetch:', error)
+            console.error('[JobProcessor] Exception during Apify fetch:', error)
             update(25, {
               timestamp: new Date().toISOString(),
-              event: 'META_FETCH_FAILED',
+              event: 'APIFY_FETCH_FAILED',
               details: {
-                provider: 'Meta GraphAPI',
+                provider: 'Apify',
                 error: error instanceof Error ? error.message : 'Unknown error'
               }
             })
           }
         } else {
-          console.log('[JobProcessor] No Meta API key provided, skipping Meta GraphAPI integration')
+          console.log('[JobProcessor] No Apify API key provided, skipping Apify integration')
+          throw new Error('Apify API key is required for production mode. Please configure it in Settings.')
         }
 
         // Continue with other services...
