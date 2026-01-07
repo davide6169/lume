@@ -182,6 +182,30 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
+ * Save log entry to database
+ */
+async function saveLogToDatabase(supabase: any, userId: string, level: string, message: string, metadata: any) {
+  try {
+    const { error } = await supabase
+      .from('logs')
+      .insert({
+        user_id: userId,
+        level,
+        message,
+        metadata
+      })
+
+    if (error) {
+      console.error('[JobProcessor] Error saving log to database:', error)
+    } else {
+      console.log(`[JobProcessor] Log saved to database: [${level.toUpperCase()}] ${message}`)
+    }
+  } catch (error) {
+    console.error('[JobProcessor] Exception saving log to database:', error)
+  }
+}
+
+/**
  * Process search job in background
  */
 async function processSearchJob(jobId: string, userId: string) {
@@ -610,6 +634,29 @@ async function processSearchJob(jobId: string, userId: string) {
 
         // Reset usage counters for next job
         usageService.resetUsage()
+
+        // Save job log to database (demo mode)
+        const currentJob = jobProcessor.getJob(jobId)
+        if (currentJob) {
+          await saveLogToDatabase(
+            supabase,
+            userId,
+            'info',
+            `Search job completed - Found ${currentJob.result?.data?.totalContacts || 0} contacts from ${currentJob.result?.data?.sharedAudiences?.length || 0} audience(s)`,
+            {
+              jobId: currentJob.id,
+              jobType: currentJob.type,
+              status: currentJob.status,
+              progress: currentJob.progress,
+              timeline: currentJob.timeline,
+              result: {
+                totalContacts: currentJob.result?.data?.totalContacts,
+                sharedAudiencesCreated: currentJob.result?.data?.sharedAudiences?.length || 0,
+                totalCost: currentJob.result?.data?.totalCost
+              }
+            }
+          )
+        }
       } else {
         // Production processing - call real APIs
         console.log(`[JobProcessor] Production mode - starting real API processing`)
@@ -1130,6 +1177,24 @@ Email: luca.verdi@techcorp.com`
         } else {
           console.log('[JobProcessor] No Mixedbread API key provided, skipping Mixedbread integration')
         }
+
+        // Save job log to database (production mode)
+        const currentJob = jobProcessor.getJob(jobId)
+        if (currentJob) {
+          await saveLogToDatabase(
+            supabase,
+            userId,
+            'info',
+            `Search job completed - Production mode`,
+            {
+              jobId: currentJob.id,
+              jobType: currentJob.type,
+              status: currentJob.status,
+              progress: currentJob.progress,
+              timeline: currentJob.timeline
+            }
+          )
+        }
       }
     })
 
@@ -1137,6 +1202,23 @@ Email: luca.verdi@techcorp.com`
     console.log(`Job ${jobId} completed successfully`)
   } catch (error) {
     console.error(`Job ${jobId} failed:`, error)
+
+    // Save error log to database
+    const failedJob = jobProcessor.getJob(jobId)
+    const supabase = await createSupabaseServerClient()
+    await saveLogToDatabase(
+      supabase,
+      userId,
+      'error',
+      `Search job failed - ${error instanceof Error ? error.message : 'Unknown error'}`,
+      {
+        jobId,
+        jobType: 'SEARCH',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timeline: failedJob?.timeline || []
+      }
+    )
+
     throw error
   }
 }
