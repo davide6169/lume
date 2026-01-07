@@ -87,6 +87,7 @@ export default function SettingsPage() {
   // Database Test states
   const [dbTestRunning, setDbTestRunning] = useState(false)
   const [dbTestResult, setDbTestResult] = useState<any>(null)
+  const [dbTestDialogOpen, setDbTestDialogOpen] = useState(false)
 
   // API Keys save confirmation dialog
   const [saveConfirmDialog, setSaveConfirmDialog] = useState(false)
@@ -149,6 +150,8 @@ export default function SettingsPage() {
       return
     }
 
+    // Open dialog to show test is running
+    setDbTestDialogOpen(true)
     setDbTestRunning(true)
     setDbTestResult(null)
 
@@ -165,21 +168,13 @@ export default function SettingsPage() {
       const result = await response.json()
       setDbTestResult(result)
 
-      if (result.success) {
-        setSaveMessage('✅ ' + result.message)
-      } else {
-        setSaveMessage('❌ ' + result.error + ': ' + (result.details?.message || ''))
-      }
-
-      setTimeout(() => setSaveMessage(''), 5000)
+      // Dialog stays open to show results
     } catch (error: any) {
       setDbTestResult({
         success: false,
         error: 'Test failed',
         details: { message: error.message || 'Unknown error' }
       })
-      setSaveMessage('❌ Test failed: ' + (error.message || 'Unknown error'))
-      setTimeout(() => setSaveMessage(''), 5000)
     } finally {
       setDbTestRunning(false)
     }
@@ -855,6 +850,81 @@ export default function SettingsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Database Test Dialog */}
+      <Dialog open={dbTestDialogOpen} onOpenChange={setDbTestDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-blue-600" />
+              Test Database Connection
+            </DialogTitle>
+            <DialogDescription>
+              Verify your Supabase database credentials are working correctly
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Test Status */}
+            {dbTestRunning && (
+              <div className="flex items-center gap-3 p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
+                <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                <div>
+                  <p className="font-medium">Testing connection...</p>
+                  <p className="text-xs text-muted-foreground">Please wait</p>
+                </div>
+              </div>
+            )}
+
+            {/* Test Result */}
+            {!dbTestRunning && dbTestResult && (
+              <div className={`p-4 rounded-lg border ${
+                dbTestResult.success
+                  ? 'bg-green-50 dark:bg-green-950 border-green-500'
+                  : 'bg-red-50 dark:bg-red-950 border-red-500'
+              }`}>
+                <div className="flex items-start gap-3">
+                  {dbTestResult.success ? (
+                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <p className="font-semibold mb-1">
+                      {dbTestResult.success ? 'Connection Successful' : 'Connection Failed'}
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {dbTestResult.success ? dbTestResult.message : dbTestResult.error}
+                    </p>
+                    {dbTestResult.details && (
+                      <div className="text-xs space-y-1">
+                        {dbTestResult.details.url && (
+                          <p className="text-muted-foreground">URL: {dbTestResult.details.url}</p>
+                        )}
+                        {dbTestResult.details.responseTime && (
+                          <p className="text-muted-foreground">Response time: {dbTestResult.details.responseTime}</p>
+                        )}
+                        {dbTestResult.details.status && (
+                          <p className="text-muted-foreground">Status: {dbTestResult.details.status}</p>
+                        )}
+                        {dbTestResult.details.message && !dbTestResult.success && (
+                          <p className="text-red-600 dark:text-red-400">{dbTestResult.details.message}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setDbTestDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Save Confirmation Dialog */}
       <Dialog open={saveConfirmDialog} onOpenChange={setSaveConfirmDialog}>

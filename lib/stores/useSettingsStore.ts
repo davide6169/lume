@@ -249,7 +249,8 @@ export const useSettingsStore = create<SettingsState>()(
         },
         setItem: (name, value) => {
           try {
-            const data = JSON.parse(value)
+            // value is already an object (StorageValue), not a string
+            const data = value
             // Encrypt before saving to storage
             if (data.state?.apiKeys) {
               data.state.apiKeys = encryptApiKeys(data.state.apiKeys)
