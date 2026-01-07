@@ -477,11 +477,11 @@ export default function DocsPage() {
                     Add your API keys for production mode:
                   </p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                    <li>• <strong>Apify:</strong> For Facebook/Instagram web scraping (Recommended)</li>
                     <li>• <strong>OpenRouter:</strong> For LLM-based contact extraction</li>
                     <li>• <strong>Mixedbread:</strong> For embedding generation</li>
                     <li>• <strong>Apollo.io:</strong> For contact enrichment</li>
                     <li>• <strong>Hunter.io:</strong> For email verification</li>
-                    <li>• <strong>Meta GraphAPI:</strong> For Facebook/Instagram data</li>
                   </ul>
                 </div>
 
@@ -737,7 +737,7 @@ export default function DocsPage() {
                 <div className="p-3 border rounded-lg">
                   <h4 className="font-semibold mb-2">Data Pipeline</h4>
                   <div className="text-sm space-y-1">
-                    <p><strong>1. Meta GraphAPI:</strong> Fetch posts/comments from FB/IG</p>
+                    <p><strong>1. Apify Scrapers:</strong> Fetch posts/comments from FB/IG</p>
                     <p><strong>2. OpenRouter LLM:</strong> Extract contact information (Claude 3.5 Sonnet)</p>
                     <p><strong>3. Contact Filtering:</strong> Separate complete vs partial contacts</p>
                     <p><strong>4. Hunter Email Finder:</strong> Find missing emails</p>
@@ -754,8 +754,8 @@ export default function DocsPage() {
                     <div className="flex items-start gap-2">
                       <Database className="h-4 w-4 mt-0.5 text-blue-600" />
                       <div>
-                        <span className="font-semibold">Meta GraphAPI</span>
-                        <span className="text-muted-foreground"> - Facebook/Instagram data</span>
+                        <span className="font-semibold">Apify</span>
+                        <span className="text-muted-foreground"> - Web scraping for FB/IG</span>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -804,6 +804,8 @@ export default function DocsPage() {
                   <div className="text-sm text-muted-foreground space-y-2">
                     <p><strong>API Costs (per contact):</strong></p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li>Apify (Instagram): $1.50 per 1,000 results</li>
+                      <li>Apify (Facebook): ~$5 per 100 results</li>
                       <li>OpenRouter LLM: ~$0.0001 - $0.001 per extraction</li>
                       <li>Mixedbread Embeddings: ~$0.00001 per embedding</li>
                       <li>Apollo Enrichment: ~$0.01 - $0.05 per contact</li>
@@ -892,11 +894,11 @@ export default function DocsPage() {
                   <div className="text-sm text-muted-foreground space-y-2">
                     <p>After configuring your database, navigate to <strong>Settings → API Keys</strong> to add more services:</p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li><strong>Apify:</strong> Your API token for Facebook/Instagram scraping</li>
                       <li><strong>OpenRouter:</strong> Your API key for LLM extraction</li>
                       <li><strong>Mixedbread:</strong> Your API key for embeddings</li>
                       <li><strong>Apollo.io:</strong> Your API key for contact enrichment</li>
                       <li><strong>Hunter.io:</strong> Your API key for email verification</li>
-                      <li><strong>Meta:</strong> Your app credentials for Facebook/Instagram</li>
                     </ul>
                   </div>
                 </div>
@@ -921,11 +923,11 @@ export default function DocsPage() {
                 <div className="border-t pt-3">
                   <h4 className="font-semibold mb-2">Getting API Keys</h4>
                   <div className="text-sm text-muted-foreground space-y-2">
+                    <p><strong>Apify:</strong> Get token at <a href="https://apify.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">apify.com</a></p>
                     <p><strong>OpenRouter:</strong> Get key at <a href="https://openrouter.ai" target="_blank" rel="noopener" className="text-blue-600 hover:underline">openrouter.ai</a></p>
                     <p><strong>Mixedbread:</strong> Get key at <a href="https://www.mixedbread.ai" target="_blank" rel="noopener" className="text-blue-600 hover:underline">mixedbread.ai</a></p>
                     <p><strong>Apollo.io:</strong> Get key at <a href="https://www.apollo.io" target="_blank" rel="noopener" className="text-blue-600 hover:underline">apollo.io</a></p>
                     <p><strong>Hunter.io:</strong> Get key at <a href="https://hunter.io" target="_blank" rel="noopener" className="text-blue-600 hover:underline">hunter.io</a></p>
-                    <p><strong>Meta:</strong> Create app at <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">developers.facebook.com</a></p>
                     <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-950 rounded text-xs">
                       <strong>Note:</strong> Supabase configuration is handled in Step 2 when you disable Demo mode.
                     </div>
@@ -959,7 +961,7 @@ export default function DocsPage() {
                 <div className="p-3 border rounded-lg">
                   <h4 className="font-semibold mb-1">Upload to Meta failed</h4>
                   <p className="text-sm text-muted-foreground">
-                    Ensure Meta GraphAPI token is valid and has permissions for Custom Audiences management.
+                    Ensure Apify API token is valid and has sufficient credits.
                   </p>
                 </div>
 

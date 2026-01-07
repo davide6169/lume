@@ -58,7 +58,7 @@
 
 ### 3. Contact Extraction Pipeline
 **Multi-Stage Enrichment Process:**
-1. **Content Fetching**: Retrieve posts/comments from Meta GraphAPI
+1. **Content Fetching**: Retrieve posts/comments from Apify web scrapers
 2. **AI Extraction**: Use LLM (OpenRouter) to extract structured contact data
 3. **Regex Pattern Matching**: Extract emails and phone numbers
 4. **Data Validation**: Filter incomplete contacts (missing required fields)
@@ -166,7 +166,7 @@
 ### External APIs
 | Service | Purpose | Pricing Model |
 |---------|---------|---------------|
-| **Meta GraphAPI** | v19.0 | Fetch FB/IG content | Free |
+| **Apify** | Web scraping | Fetch FB/IG content | Instagram: $1.50/1K results, Facebook: ~$5/100 results |
 | **OpenRouter** | LLM API | Contact extraction | ~$0.0001/token |
 | **Mixedbread AI** | Embeddings | Semantic search | ~$0.00001/token |
 | **Apollo.io** | Enrichment | Find missing data | $0.02/enrichment |
@@ -240,7 +240,7 @@ Client polls /api/jobs/[id] every 2s
     ↓
 Job Progress Updates
     ↓
-Meta GraphAPI → Fetch Posts/Comments
+Apify Scrapers → Fetch Posts/Comments
     ↓
 ContactExtractor → Regex + AI Extraction
     ↓
@@ -1087,7 +1087,7 @@ Delete specific log entry (admin only).
 #### 5. Configure Additional API Keys (Optional)
 - Go to **Settings** → **API Keys** tab
 - Enter API keys for services you want to use:
-  - **Meta (Facebook/Instagram)**: Required for fetching content
+  - **Apify**: Required for Facebook/Instagram web scraping
   - **OpenRouter**: Required for AI contact extraction
   - **Mixedbread**: Required for embeddings
   - **Apollo.io**: Required for contact enrichment
@@ -1176,11 +1176,11 @@ Delete specific log entry (admin only).
 - Real-time updates during jobs
 
 **Cost Breakdown:**
+- **Apify**: Pay-per-result (Instagram: $1.50/1K results, Facebook: ~$5/100 results)
 - **OpenRouter**: Per-token pricing
 - **Mixedbread**: Per-token pricing
 - **Apollo.io**: Per-enrichment
 - **Hunter.io**: Per-call (finder/verifier)
-- **Meta**: Free
 
 ---
 
@@ -1223,10 +1223,8 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # Application
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# Meta
-META_APP_ID=your-app-id
-META_APP_SECRET=your-app-secret
-META_ACCESS_TOKEN=your-access-token
+# Apify
+APIFY_API_TOKEN=your-apify-token
 
 # External APIs
 OPENROUTER_API_KEY=your-openrouter-key
@@ -1331,7 +1329,7 @@ components/
 ```
 lib/services/
 ├── job-processor.ts          # Job management singleton
-├── meta-graphapi.ts          # Meta API integration
+├── apify-scraper.ts          # Apify web scraping integration
 ├── contact-extractor.ts      # Contact extraction logic
 ├── apollo-enrichment-stub.ts # Apollo.io integration
 ├── hunter-io-stub.ts         # Hunter.io integration
@@ -1568,32 +1566,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-#### 3. Configure Supabase
+#### 3. Configure Apify
 
 ```bash
-# Update site URL in Supabase
-# Project Settings → API → URL
-
-# Configure Meta OAuth
-# Project Settings → Authentication → Providers → Facebook
-# Callback URL: https://your-domain.vercel.app/api/auth/meta/callback
-```
-
-#### 4. Configure Meta App
-
-```bash
-# Go to Meta Developers Portal
-# Your App → Settings → Basic
-
-# Add redirect URIs:
-# - https://your-domain.vercel.app/api/auth/meta/callback
-# - https://your-domain.vercel.app
-
-# Set permissions:
-# - pages_show_list
-# - groups_access_member_info
-# - instagram_basic
-# - instagram_manage_comments
+# Create account at https://apify.com
+# Get API token from Account → API Tokens
+# Add to Vercel environment variables as APIFY_API_TOKEN
 ```
 
 ### Environment Variables Checklist
@@ -1608,9 +1586,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`
 
 **Optional (for production mode - user-configured):**
-- [ ] `META_APP_ID`
-- [ ] `META_APP_SECRET`
-- [ ] `META_ACCESS_TOKEN`
+- [ ] `APIFY_API_TOKEN`
 - [ ] `OPENROUTER_API_KEY`
 - [ ] `MIXEDBREAD_API_KEY`
 - [ ] `APOLLO_API_KEY`
@@ -1712,12 +1688,12 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 - Ensure sufficient credits/quota
 - Check network tab for failed requests
 
-#### 4. Meta Upload Failing
+#### 4. Apify Upload Failing
 **Solution:**
-- Verify Meta access token is valid
-- Check token permissions
-- Ensure audience has contacts
-- Check Meta API rate limits
+- Verify Apify API token is valid
+- Check token has sufficient credits
+- Ensure source URLs are accessible
+- Check Apify dashboard for rate limits
 
 #### 5. Costs Not Showing
 **Solution:**
