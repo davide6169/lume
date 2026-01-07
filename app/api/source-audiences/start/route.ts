@@ -320,6 +320,29 @@ async function processSearchJob(jobId: string, userId: string) {
 
           await new Promise(resolve => setTimeout(resolve, 1500))
 
+          // Simulate Apify web scraping for each URL
+          let totalFetchedResults = 0
+          for (let j = 0; j < audience.urls.length; j++) {
+            await new Promise(resolve => setTimeout(resolve, 300))
+
+            // Simulate Apify scraping results
+            const resultsPerUrl = 20 + Math.floor(Math.random() * 30) // 20-50 results per URL
+            usageService.simulateApifyCall(resultsPerUrl)
+            totalFetchedResults += resultsPerUrl
+
+            update(audienceProgress - 5 + (j / audience.urls.length) * 1, {
+              timestamp: new Date().toISOString(),
+              event: 'APIFY_FETCH_COMPLETED',
+              details: {
+                url: audience.urls[j],
+                urlIndex: j + 1,
+                provider: 'Apify',
+                platform: audience.type === 'facebook' ? 'Facebook' : 'Instagram',
+                resultsFetched: resultsPerUrl
+              }
+            })
+          }
+
           // Simulate LLM extraction for each URL
           let totalDraftContacts = 0
           for (let j = 0; j < audience.urls.length; j++) {
@@ -613,6 +636,26 @@ async function processSearchJob(jobId: string, userId: string) {
                 cost,
                 units: verifierCalls,
                 unitType: 'calls'
+              })
+            }
+          }
+
+          // Apify cost (Facebook/Instagram scraping)
+          if (currentJob.payload.initialUsage?.apify && finalApify.data) {
+            const initialResults = currentJob.payload.initialUsage.apify.results_fetched || 0
+            const finalResults = finalApify.data.usage.results_fetched || 0
+            const resultsFetched = finalResults - initialResults
+            if (resultsFetched > 0) {
+              // Use average pricing (mix of Facebook and Instagram)
+              // Instagram: $1.50/1000 results, Facebook: $5.00/100 results
+              // Average: ~$0.003 per result for estimation
+              const cost = resultsFetched * 0.003
+              costs.push({
+                service: 'apify',
+                operation: 'Web Scraping',
+                cost,
+                units: resultsFetched,
+                unitType: 'results'
               })
             }
           }
