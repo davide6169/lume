@@ -84,13 +84,13 @@ export async function POST(request: Request) {
       initialMixedbread,
       initialApollo,
       initialHunter,
-      initialMeta
+      initialApify
     ] = await Promise.all([
       usageService.getOpenRouterUsage(),
       usageService.getMixedbreadUsage(),
       usageService.getApolloUsage(),
       usageService.getHunterUsage(),
-      usageService.getMetaUsage()
+      usageService.getApifyUsage()
     ])
 
     console.log('[Search Job Start] Initial API usage captured')
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
         mixedbread: initialMixedbread.data.usage,
         apollo: initialApollo.data,
         hunter: initialHunter.data,
-        meta: initialMeta.data.usage
+        apify: initialApify.data.usage
       }
     })
 
@@ -459,12 +459,12 @@ async function processSearchJob(jobId: string, userId: string) {
         })
 
         // Calculate API costs
-        const [finalOpenRouter, finalMixedbread, finalApollo, finalHunter, finalMeta] = await Promise.all([
+        const [finalOpenRouter, finalMixedbread, finalApollo, finalHunter, finalApify] = await Promise.all([
           usageService.getOpenRouterUsage(),
           usageService.getMixedbreadUsage(),
           usageService.getApolloUsage(),
           usageService.getHunterUsage(),
-          usageService.getMetaUsage()
+          usageService.getApifyUsage()
         ])
 
         // Calculate costs by comparing initial and final usage

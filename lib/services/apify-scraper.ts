@@ -157,6 +157,10 @@ export class ApifyScraperService {
           text: item.text || '',
           timestamp: item.timestamp || new Date().toISOString(),
           username: item.ownerUsername || '',
+          from: {
+            username: item.ownerUsername || '',
+            id: item.ownerId || ''
+          },
           like_count: 0, // Apify doesn't provide this in basic mode
         }))
     } catch (error) {
@@ -411,16 +415,14 @@ export class ApifyScraperService {
           type: MetaErrorType.AUTH_ERROR,
           message: 'Invalid Apify API token. Please reconfigure in Settings.',
           recoverable: false,
-          originalError: error,
         }
       }
 
       if (status === 404) {
         return {
-          type: MetaErrorType.NOT_FOUND,
+          type: MetaErrorType.RESOURCE_NOT_FOUND,
           message: 'Resource not found on Apify.',
           recoverable: false,
-          originalError: error,
         }
       }
 
@@ -429,7 +431,6 @@ export class ApifyScraperService {
           type: MetaErrorType.RATE_LIMIT,
           message: 'Apify rate limit exceeded. Please try again later.',
           recoverable: true,
-          originalError: error,
         }
       }
 
@@ -438,7 +439,6 @@ export class ApifyScraperService {
         type: MetaErrorType.UNKNOWN,
         message: `Apify error: ${message}`,
         recoverable: false,
-        originalError: error,
       }
     }
 
@@ -447,7 +447,6 @@ export class ApifyScraperService {
       type: MetaErrorType.UNKNOWN,
       message: error instanceof Error ? error.message : 'Unknown error',
       recoverable: false,
-      originalError: error,
     }
   }
 
