@@ -222,10 +222,10 @@ export default function DashboardLayout({
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium">
-                        {profile?.fullName || user?.email?.split('@')[0] || isDemoMode ? 'Demo User' : 'User'}
+                        {isDemoMode ? 'Demo User' : (profile?.fullName || user?.email?.split('@')[0] || 'User')}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {profile?.email || user?.email || isDemoMode ? 'demo@lume.app' : ''}
+                        {isDemoMode ? 'demo@lume.app' : (profile?.email || user?.email || '')}
                       </p>
                       <p className="text-xs text-muted-foreground capitalize">
                         {profile?.role || (isDemoMode ? 'demo' : 'user')}
