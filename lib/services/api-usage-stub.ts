@@ -268,11 +268,11 @@ export class APIUsageStubService {
   }
 
   /**
-   * Simulate Meta GraphAPI call
+   * Simulate Apify scraping call
    */
-  simulateMetaCall(count: number): void {
-    this.counters.meta_calls += count
-    console.log(`[APIUsageStubService] Simulated Meta GraphAPI call: ${count} calls`)
+  simulateApifyCall(resultsCount: number): void {
+    this.counters.apify_results += resultsCount
+    console.log(`[APIUsageStubService] Simulated Apify scraping: ${resultsCount} results`)
   }
 
   /**
@@ -287,7 +287,7 @@ export class APIUsageStubService {
     this.counters.apollo_enrichments = 0
     this.counters.hunter_finder_calls = 0
     this.counters.hunter_verifier_calls = 0
-    this.counters.meta_calls = 0
+    this.counters.apify_results = 0
   }
 }
 
@@ -320,8 +320,10 @@ export const API_PRICING = {
     email_finder: 0.02, // 2 credits per search
     email_verifier: 0.001, // 1 credit per verification
   },
-  meta: {
-    free_tier: true, // Meta GraphAPI is free
-    per_call: 0
+  apify: {
+    instagram: 1.50, // per 1,000 results
+    facebook: 5.00, // per ~100 results
+    per_result_instagram: 1.50 / 1000,
+    per_result_facebook: 5.00 / 100
   }
 }
