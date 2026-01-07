@@ -603,6 +603,7 @@ export function SourceAudienceList() {
       // In production mode, pass API keys securely
       if (!isDemoMode) {
         requestBody.apiKeys = {
+          apify: apiKeys.apify,
           apollo: apiKeys.apollo,
           hunter: apiKeys.hunter,
           openrouter: apiKeys.openrouter,

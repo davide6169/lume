@@ -142,8 +142,8 @@ export class ApifyScraperService {
       // Start Apify Instagram scraper
       const run = await this.startInstagramScraper(url, options)
 
-      // Wait for completion
-      await this.waitForRun(run.id)
+      // Wait for completion (pass actor ID)
+      await this.waitForRun(run.id, 'apify~instagram-scraper')
 
       // Fetch results
       const datasetId = run.datasetId
@@ -221,8 +221,8 @@ export class ApifyScraperService {
       // Start Apify Facebook scraper
       const run = await this.startFacebookScraper(url, options)
 
-      // Wait for completion
-      await this.waitForRun(run.id)
+      // Wait for completion (pass actor ID)
+      await this.waitForRun(run.id, 'apify~facebook-posts-scraper')
 
       // Fetch results
       const datasetId = run.datasetId
@@ -254,7 +254,7 @@ export class ApifyScraperService {
     options: FetchOptions
   ): Promise<ApifyRunResponse> {
     const response = await fetch(
-      `${this.baseUrl}/acts/apify~facebook-scraper/runs`,
+      `${this.baseUrl}/acts/apify~facebook-posts-scraper/runs`,
       {
         method: 'POST',
         headers: {
@@ -322,12 +322,12 @@ export class ApifyScraperService {
   /**
    * Wait for an Apify run to complete
    */
-  private async waitForRun(runId: string, maxWaitTime: number = 300000): Promise<void> {
+  private async waitForRun(runId: string, actorId: string, maxWaitTime: number = 300000): Promise<void> {
     const startTime = Date.now()
     const pollInterval = 2000 // Check every 2 seconds
 
     while (Date.now() - startTime < maxWaitTime) {
-      const response = await fetch(`${this.baseUrl}/acts/apify~instagram-scraper/runs/${runId}`, {
+      const response = await fetch(`${this.baseUrl}/acts/${actorId}/runs/${runId}`, {
         headers: {
           'Authorization': `Bearer ${this.apiToken}`,
         },

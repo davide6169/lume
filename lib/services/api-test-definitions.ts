@@ -41,18 +41,6 @@ export const apiTestDefinitions: ApiServiceTests = {
         contains: ['data', 'id', 'username'],
       },
     },
-    {
-      id: 'list-actors',
-      name: 'List Available Actors',
-      description: 'List available Apify actors for Instagram/Facebook',
-      endpoint: 'https://api.apify.com/v2/acts',
-      method: 'GET',
-      expectedOutcome: {
-        success: true,
-        statusCodes: [200],
-        contains: ['data', 'items'],
-      },
-    },
   ],
 
   meta: [
