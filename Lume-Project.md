@@ -239,6 +239,49 @@
 - **Type Safety**: Fixed `StorageValue` type handling in setItem function
 - **Build Stability**: Next.js build passes without TypeScript errors
 
+#### 12.14 Configurable Log Retention
+- **Retention Days Setting**: Configure how long to keep logs (1-30 days, default: 3)
+- **Settings Location**: Available in Settings → Preferences tab
+- **Persistent Configuration**: Saved in settings store and exportable
+- **Flexible Retention**: Balance audit trail needs vs database storage
+
+#### 12.15 Automatic Log Cleanup
+- **Server-Side Cleanup**: Automatic deletion of logs older than retention period
+- **Trigger Points**: Cleanup runs after each job completion
+- **Admin-Only**: Only admins can trigger cleanup operations
+- **Smart Cutoff**: Calculates cutoff date based on retention days setting
+- **Non-Blocking**: Cleanup failures don't affect job execution
+- **API Endpoint**: POST /api/logs/cleanup for manual cleanup
+
+#### 12.16 Custom Favicon with Brand Logo
+- **Branded Icon**: Custom favicon with "L" logo in gradient circle
+- **SVG Format**: Scalable vector graphics for crisp display at any size
+- **Gradient Design**: Blue (#3B82F6) to purple (#9333EA) gradient matching brand
+- **Universal Usage**: Shows in browser tabs, bookmarks, and mobile home screens
+- **Automatic Detection**: Next.js automatically uses favicon.svg from app/ directory
+- **Metadata Configuration**: Icons configured in root layout for all platforms
+
+#### 12.17 Logo Size Updates
+- **Navigation Menu**: Simplified logo from complex SVG to "L" in circle (40x40px)
+- **Authentication Pages**: Enlarged logo from 80px to 256px for better visibility
+- **Login Page**: Full logo with tagline at natural size
+- **Signup Page**: Full logo with tagline at natural size
+- **Consistent Branding**: Logo size appropriate for each context
+- **Improved UX**: Better visual impact on auth pages, cleaner header navigation
+
+#### 12.18 Apify Cost Tracking Fix
+- **Critical Fix**: Apify costs now included in Total Cost calculation
+- **Production Mode**: Tracks actual results fetched from Apify APIs
+- **Demo Mode**: Simulates Apify scraping with realistic costs
+- **Cost Calculation**: Average pricing ~$0.003 per result (mix of FB/IG rates)
+- **Complete Tracking**: All paid services now tracked in Dashboard:
+  - ✅ OpenRouter (LLM extraction)
+  - ✅ Mixedbread (Embeddings)
+  - ✅ Apollo (Contact enrichment)
+  - ✅ Hunter.io (Email finder + verifier)
+  - ✅ Apify (Web scraping) - NOW INCLUDED
+  - ✅ Meta (GraphAPI - free)
+
 ---
 
 ## Technology Stack

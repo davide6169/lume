@@ -515,13 +515,15 @@ export default function DocsPage() {
                 <div className="border-t pt-3">
                   <h4 className="font-semibold mb-1">Preferences</h4>
                   <p className="text-sm text-muted-foreground">
-                    Configure AI models and scraping limits:
+                    Configure AI models, scraping limits, and log retention:
                   </p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
                     <li>• <strong>LLM Model:</strong> Select OpenRouter model for contact extraction (default: mistral-7b-instruct:free)</li>
                     <li>• <strong>Embedding Model:</strong> Choose Mixedbread model for semantic search (default: mxbai-embed-large-v1)</li>
                     <li>• <strong>Facebook Posts Limit:</strong> Set max Facebook posts to retrieve (1-10,000, default: 100)</li>
                     <li>• <strong>Instagram Comments Limit:</strong> Set max Instagram comments to retrieve (1-10,000, default: 100)</li>
+                    <li>• <strong>Log Retention Days:</strong> Configure how long to keep system logs (1-30 days, default: 3)</li>
+                    <li>• <strong>Automatic Cleanup:</strong> Logs older than retention period are automatically deleted</li>
                     <li>• <strong>Save Confirmation:</strong> "Save Preferences" button confirms changes</li>
                     <li>• <strong>Cost Control:</strong> Lower limits reduce API usage costs</li>
                   </ul>
@@ -554,6 +556,8 @@ export default function DocsPage() {
                 <p>View detailed logs of all operations including:</p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
                   <li><strong>Automatic Job Logging:</strong> Jobs automatically save logs to database on completion</li>
+                  <li><strong>Automatic Log Cleanup:</strong> Old logs deleted based on retention policy (default: 3 days)</li>
+                  <li><strong>Configurable Retention:</strong> Set how long to keep logs in Settings → Preferences</li>
                   <li><strong>Complete Timeline:</strong> All job events captured including:
                     <ul className="ml-6 mt-1 space-y-0.5">
                       <li>– Apify token validation events</li>
@@ -609,6 +613,56 @@ export default function DocsPage() {
                 <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
                   <p className="text-xs">
                     <strong>Demo Mode Data:</strong> When Demo mode is ON, this page shows 4 dummy users (1 admin + 3 users with 2 pending) to demonstrate the approval workflow without real data.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Dashboard & Cost Tracking</CardTitle>
+              <CardDescription>Monitor your statistics and API costs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p><strong>Dashboard Overview:</strong></p>
+                <ul className="list-disc list-inside space-y-1 ml-4">
+                  <li><strong>Source Audiences:</strong> Total number of Facebook/Instagram source audiences created</li>
+                  <li><strong>Total URLs:</strong> Combined count of all URLs across source audiences</li>
+                  <li><strong>Contacts Found:</strong> Total contacts extracted from all sources</li>
+                  <li><strong>Uploaded to Meta:</strong> Number of audiences uploaded to Meta Custom Audiences</li>
+                  <li><strong>Total Cost:</strong> Complete cost breakdown including all paid services</li>
+                </ul>
+
+                <p className="mt-3"><strong>Cost Tracking:</strong></p>
+                <ul className="list-disc list-inside space-y-1 ml-4">
+                  <li><strong>All Services Tracked:</strong>
+                    <ul className="ml-6 mt-1 space-y-0.5">
+                      <li>– OpenRouter (LLM contact extraction)</li>
+                      <li>– Mixedbread AI (Vector embeddings)</li>
+                      <li>– Apollo.io (Contact enrichment)</li>
+                      <li>– Hunter.io (Email finder + verifier)</li>
+                      <li>– Apify (Facebook/Instagram web scraping) ✅</li>
+                      <li>– Meta GraphAPI (Free)</li>
+                    </ul>
+                  </li>
+                  <li><strong>Real-Time Updates:</strong> Costs update automatically as jobs complete</li>
+                  <li><strong>Detailed Breakdown:</strong> Cost breakdown by service with percentage distribution</li>
+                  <li><strong>Visual Charts:</strong> Color-coded bars showing cost distribution</li>
+                  <li><strong>Persistent Storage:</strong> Costs saved to database for historical tracking</li>
+                  <li><strong>Recent Activity:</strong> 7-day activity chart showing API usage patterns</li>
+                </ul>
+
+                <div className="mt-3 p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                  <p className="text-xs">
+                    <strong>Apify Cost Tracking:</strong> Web scraping costs for Facebook and Instagram are now accurately tracked and included in the Total Cost. Costs are calculated based on results fetched (~$0.003 per result average for FB/IG).
+                  </p>
+                </div>
+
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                  <p className="text-xs">
+                    <strong>Demo Mode:</strong> Shows realistic demo data with simulated costs for all services. Perfect for exploring the platform without spending real credits.
                   </p>
                 </div>
               </div>
