@@ -22,7 +22,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { LumeLogo } from '@/components/icons/lume-logo'
 import {
   LayoutDashboard,
   Users,
@@ -130,8 +129,8 @@ export default function DashboardLayout({
           <div className="container flex h-16 items-center justify-between px-4">
             <div className="flex items-center gap-4">
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-10 h-10">
-                  <LumeLogo className="w-full h-full" />
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <span className="text-white font-bold text-xl">L</span>
                 </div>
                 <span className="font-bold text-xl">Lume</span>
               </Link>
