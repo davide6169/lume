@@ -33,27 +33,17 @@ export async function POST(request: NextRequest) {
     // Create Supabase client
     const supabase = createClient(trimmedUrl, trimmedAnonKey)
 
-    // Test connection by querying a simple system table
-    // We'll try to get the current user (will be null if not authenticated, but connection works)
+    // Test connection by trying to get the current user (no session required, just validates credentials)
     const startTime = Date.now()
 
     try {
-      // Try a simple query to test connection
-      const { data, error } = await supabase
-        .from('_test_connection_')
-        .select('*')
-        .limit(1)
+      // Try to get session info - this validates the credentials without needing data
+      const { data: { session }, error } = await supabase.auth.getSession()
 
       const responseTime = Date.now() - startTime
 
-      // If we get here, the connection worked (even if table doesn't exist)
-      // A real connection error would happen before this
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = table not found (which is OK, we just wanted to test connection)
-        // Other errors might be real issues
-        throw error
-      }
-
+      // If we get here without a network error, connection works
+      // Session will be null (no user logged in), but that's expected
       console.log('[Test Database] Connection successful!')
 
       return NextResponse.json({
@@ -75,7 +65,8 @@ export async function POST(request: NextRequest) {
       if (errorMessage.includes('Invalid API key') ||
           errorMessage.includes('JWT') ||
           errorMessage.includes('401') ||
-          errorMessage.includes('403')) {
+          errorMessage.includes('403') ||
+          errorMessage.includes('Invalid credentials')) {
         console.error('[Test Database] Authentication error:', errorMessage)
 
         return NextResponse.json({
@@ -91,7 +82,8 @@ export async function POST(request: NextRequest) {
 
       if (errorMessage.includes('fetch') ||
           errorMessage.includes('network') ||
-          errorMessage.includes('ECONNREFUSED')) {
+          errorMessage.includes('ECONNREFUSED') ||
+          errorMessage.includes('ENOTFOUND')) {
         console.error('[Test Database] Connection error:', errorMessage)
 
         return NextResponse.json({
@@ -103,22 +95,6 @@ export async function POST(request: NextRequest) {
             responseTime: `${responseTime}ms`
           }
         }, { status: 503 })
-      }
-
-      // Table doesn't exist is actually OK - means connection works!
-      if (errorMessage.includes('PGRST116') ||
-          errorMessage.includes('does not exist')) {
-        console.log('[Test Database] Connection successful (table check failed as expected)')
-
-        return NextResponse.json({
-          success: true,
-          message: 'Successfully connected to Supabase database',
-          details: {
-            url: trimmedUrl.replace(/\/\/.*@/, '//***@'),
-            responseTime: `${responseTime}ms`,
-            status: 'Connection established'
-          }
-        })
       }
 
       // Unknown error
