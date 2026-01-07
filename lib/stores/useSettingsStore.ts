@@ -22,6 +22,7 @@ interface SettingsState {
 
   // API Keys (encrypted, stored client-side)
   apiKeys: {
+    apify?: string
     meta?: string
     supabase?: string
     openrouter?: string

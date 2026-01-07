@@ -28,6 +28,33 @@ export interface ApiServiceTests {
  * Test scenarios for each API service
  */
 export const apiTestDefinitions: ApiServiceTests = {
+  apify: [
+    {
+      id: 'verify-token',
+      name: 'Verify API Token',
+      description: 'Validate Apify API token by fetching user info',
+      endpoint: 'https://api.apify.com/v2/users/me',
+      method: 'GET',
+      expectedOutcome: {
+        success: true,
+        statusCodes: [200],
+        contains: ['data', 'id', 'username'],
+      },
+    },
+    {
+      id: 'list-actors',
+      name: 'List Available Actors',
+      description: 'List available Apify actors for Instagram/Facebook',
+      endpoint: 'https://api.apify.com/v2/acts',
+      method: 'GET',
+      expectedOutcome: {
+        success: true,
+        statusCodes: [200],
+        contains: ['data', 'items'],
+      },
+    },
+  ],
+
   meta: [
     {
       id: 'get-page-info',

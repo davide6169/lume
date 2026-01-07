@@ -16,7 +16,8 @@ import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText, Play, Check
 import { getTestScenarios } from '@/lib/services/api-test-definitions'
 
 const apiServices = [
-  { key: 'meta' as const, name: 'Meta (Facebook/Instagram)', description: 'For accessing social media data' },
+  { key: 'apify' as const, name: 'Apify', description: 'Web scraping for Facebook/Instagram (Recommended)' },
+  { key: 'meta' as const, name: 'Meta (Facebook/Instagram)', description: 'Direct GraphAPI access' },
   { key: 'openrouter' as const, name: 'OpenRouter', description: 'LLM API for AI processing' },
   { key: 'mixedbread' as const, name: 'Mixedbread', description: 'Embeddings API for contact analysis' },
   { key: 'apollo' as const, name: 'Apollo.io', description: 'Contact data enrichment' },
