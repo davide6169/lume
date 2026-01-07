@@ -466,7 +466,16 @@ export default function DocsPage() {
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
                     <li>• <strong>Supabase URL:</strong> Your project URL from Supabase dashboard</li>
                     <li>• <strong>Supabase Anon Key:</strong> Your public/anon key from Supabase dashboard</li>
-                    <li>• <strong>Test Connection:</strong> Verify credentials before saving with real-time validation</li>
+                    <li>• <strong>Test Connection (▶):</strong> Icon button next to anon key field</li>
+                    <li>• <strong>Test Dialog:</strong> Shows real-time validation with loading spinner</li>
+                    <li>• <strong>Success/Failure:</strong> Green (success) or red (failure) with detailed info:
+                      <ul className="ml-6 mt-1 space-y-0.5">
+                        <li>– Connection status message</li>
+                        <li>– Supabase URL (credentials masked)</li>
+                        <li>– Response time</li>
+                        <li>– Detailed error messages if failed</li>
+                      </ul>
+                    </li>
                     <li>• <strong>Save Confirmation:</strong> Confirmation dialog validates inputs before saving</li>
                     <li>• <strong>Multi-Tenant:</strong> Each user configures their own database</li>
                   </ul>
@@ -544,10 +553,23 @@ export default function DocsPage() {
               <div className="text-sm text-muted-foreground space-y-2">
                 <p>View detailed logs of all operations including:</p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>Job processing timeline</li>
-                  <li>API calls and responses</li>
-                  <li>Contact filtering and enrichment</li>
-                  <li>Errors and warnings</li>
+                  <li><strong>Automatic Job Logging:</strong> Jobs automatically save logs to database on completion</li>
+                  <li><strong>Complete Timeline:</strong> All job events captured including:
+                    <ul className="ml-6 mt-1 space-y-0.5">
+                      <li>– Apify token validation events</li>
+                      <li>– Facebook/Instagram scraping events</li>
+                      <li>– LLM extraction events</li>
+                      <li>– Contact enrichment events</li>
+                      <li>– All other timeline events</li>
+                    </ul>
+                  </li>
+                  <li><strong>Error Logging:</strong> Failed jobs automatically save error logs with timeline</li>
+                  <li><strong>Always Persisted:</strong> Logs saved even if user is not on the page when job completes</li>
+                  <li><strong>Admin Only:</strong> Logs accessible via Settings → Logs (admin only)</li>
+                  <li><strong>Log Details:</strong> Each log includes job ID, type, status, progress, full timeline, and results</li>
+                  <li><strong>Interactive Display:</strong> Click log cards to expand and view full details</li>
+                  <li><strong>Export:</strong> Export individual logs or all logs to TXT files</li>
+                  <li><strong>Filter:</strong> Filter logs by level (error, warn, info, debug)</li>
                 </ul>
                 <p className="mt-2">
                   <Badge variant="secondary">Admin Only</Badge>

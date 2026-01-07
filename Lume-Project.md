@@ -190,6 +190,55 @@
 - **Improved Error Messages**: Better feedback on test failures
 - **Test Result Details**: More information in test responses
 
+#### 12.8 Database Test Dialog UX Improvements
+- **Dialog-Based Results**: Database connection test now shows results in a dialog (like API Keys tests)
+- **Real-Time Feedback**: Loading spinner while testing connection
+- **Success/Failure Indicators**: Green (success) or red (failure) status with detailed information
+  - Connection status message
+  - Supabase URL (credentials masked)
+  - Response time
+  - Detailed error messages if connection fails
+- **Consistent UX**: Matches the pattern used for API Keys test results
+
+#### 12.9 Automatic Database Logging for Jobs
+- **Server-Side Logging**: Jobs automatically save logs to database on completion
+- **Complete Timeline**: All job events captured in logs, including:
+  - Apify token validation events
+  - Facebook/Instagram scraping events
+  - LLM extraction events
+  - Contact enrichment events
+  - All other timeline events
+- **Error Logging**: Failed jobs automatically save error logs with timeline
+- **Always Persisted**: Logs saved even if user is not on the page when job completes
+- **Admin Visibility**: Logs accessible via Settings → Logs (admin only)
+- **Log Details**: Each log includes:
+  - Job ID and type
+  - Status and progress
+  - Full event timeline
+  - Result details (contacts, audiences, costs)
+
+#### 12.10 Navigation UX Improvements
+- **Removed Duplicate Settings**: Settings removed from main navigation menu
+- **Cleaner Navigation**: Less clutter in top navigation bar
+- **Settings Access**: Settings accessible via user menu (avatar, top right)
+- **Maintained Functionality**: All features remain accessible
+
+#### 12.11 User Menu Display Fix
+- **Real User Data**: User menu now correctly shows real user data when logged in
+- **Demo Mode Handling**: Properly distinguishes between demo mode and logged-in users
+- **Conditional Logic**: Fixed ternary operator priority to check demo mode first
+- **Accurate Display**: Shows correct name, email, and role for logged-in users
+
+#### 12.12 Import/Export UX Refinements
+- **Button Rename**: Import button renamed from "Import Settings from File" to "Import Settings"
+- **Consistent Naming**: Matches export button "Export Settings"
+- **Cleaner UI**: Shorter, more concise button labels
+
+#### 12.13 TypeScript & Stability Fixes
+- **Storage Middleware Fix**: Corrected TypeScript error in custom storage middleware
+- **Type Safety**: Fixed `StorageValue` type handling in setItem function
+- **Build Stability**: Next.js build passes without TypeScript errors
+
 ---
 
 ## Technology Stack
