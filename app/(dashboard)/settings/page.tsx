@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSettingsStore } from '@/lib/stores/useSettingsStore'
 import { useDemoStore } from '@/lib/stores/useDemoStore'
 import { Card } from '@/components/ui/card'
@@ -63,6 +63,7 @@ export default function SettingsPage() {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [tempKeys, setTempKeys] = useState(apiKeys)
   const [saveMessage, setSaveMessage] = useState('')
+
   const [exportDialog, setExportDialog] = useState(false)
   const [exportFileName, setExportFileName] = useState(`lume-settings-${new Date().toISOString().split('T')[0]}.json`)
 
