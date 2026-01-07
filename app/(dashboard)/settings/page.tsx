@@ -84,6 +84,10 @@ export default function SettingsPage() {
   const [testRunning, setTestRunning] = useState(false)
   const [testResult, setTestResult] = useState<any>(null)
 
+  // Database Test states
+  const [dbTestRunning, setDbTestRunning] = useState(false)
+  const [dbTestResult, setDbTestResult] = useState<any>(null)
+
   // API Keys save confirmation dialog
   const [saveConfirmDialog, setSaveConfirmDialog] = useState(false)
   const [savedKeysCount, setSavedKeysCount] = useState(0)
@@ -135,6 +139,50 @@ export default function SettingsPage() {
     // Show confirmation dialog
     setSavingType('database')
     setSaveConfirmDialog(true)
+  }
+
+  const handleTestDatabase = async () => {
+    // Validate inputs first
+    if (!tempSupabaseUrl.trim() || !tempSupabaseAnonKey.trim()) {
+      setSaveMessage('Error: Please fill in both Supabase URL and anon key before testing')
+      setTimeout(() => setSaveMessage(''), 5000)
+      return
+    }
+
+    setDbTestRunning(true)
+    setDbTestResult(null)
+
+    try {
+      const response = await fetch('/api/settings/test-database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: tempSupabaseUrl.trim(),
+          anonKey: tempSupabaseAnonKey.trim()
+        }),
+      })
+
+      const result = await response.json()
+      setDbTestResult(result)
+
+      if (result.success) {
+        setSaveMessage('✅ ' + result.message)
+      } else {
+        setSaveMessage('❌ ' + result.error + ': ' + (result.details?.message || ''))
+      }
+
+      setTimeout(() => setSaveMessage(''), 5000)
+    } catch (error: any) {
+      setDbTestResult({
+        success: false,
+        error: 'Test failed',
+        details: { message: error.message || 'Unknown error' }
+      })
+      setSaveMessage('❌ Test failed: ' + (error.message || 'Unknown error'))
+      setTimeout(() => setSaveMessage(''), 5000)
+    } finally {
+      setDbTestRunning(false)
+    }
   }
 
   const handleSavePreferences = () => {
@@ -363,17 +411,83 @@ export default function SettingsPage() {
                   <li>Create a new project (takes about 2 minutes)</li>
                   <li>Go to Settings → API in your project dashboard</li>
                   <li>Copy the Project URL and anon/public key</li>
-                  <li>Paste them above and click "Save Database Configuration"</li>
+                  <li>Paste them above and click "Test Connection" then "Save Database Configuration"</li>
                 </ol>
               </div>
             </div>
 
             {/* Save Button */}
-            <div className="pt-4 border-t">
-              <Button onClick={handleSaveSupabaseWithConfirm} className="w-full" size="lg">
-                <Save className="h-4 w-4 mr-2" />
-                Save Database Configuration
-              </Button>
+            <div className="pt-4 border-t space-y-3">
+              {/* Test Connection Button */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleTestDatabase}
+                  disabled={dbTestRunning}
+                  variant="outline"
+                  className="flex-1"
+                  size="lg"
+                >
+                  {dbTestRunning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Test Connection
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleSaveSupabaseWithConfirm}
+                  className="flex-1"
+                  size="lg"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Database Configuration
+                </Button>
+              </div>
+
+              {/* Test Result */}
+              {dbTestResult && (
+                <Alert className={dbTestResult.success ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-red-500 bg-red-50 dark:bg-red-950'}>
+                  {dbTestResult.success ? (
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  )}
+                  <AlertDescription className="text-sm">
+                    <div className="font-semibold mb-1">
+                      {dbTestResult.success ? 'Connection Successful' : 'Connection Failed'}
+                    </div>
+                    <div className="text-xs space-y-1">
+                      <p>{dbTestResult.success ? dbTestResult.message : dbTestResult.error}</p>
+                      {dbTestResult.details && (
+                        <div className="mt-2 space-y-1">
+                          {dbTestResult.details.url && (
+                            <p className="text-muted-foreground">URL: {dbTestResult.details.url}</p>
+                          )}
+                          {dbTestResult.details.responseTime && (
+                            <p className="text-muted-foreground">Response time: {dbTestResult.details.responseTime}</p>
+                          )}
+                          {dbTestResult.details.message && !dbTestResult.success && (
+                            <p className="text-red-600 dark:text-red-400">{dbTestResult.details.message}</p>
+                          )}
+                          {dbTestResult.details.status && (
+                            <p className="text-muted-foreground">Status: {dbTestResult.details.status}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Save message */}
+              {saveMessage && savingType === 'database' && (
+                <p className="text-sm text-center text-muted-foreground">{saveMessage}</p>
+              )}
             </div>
           </Card>
         </TabsContent>
