@@ -137,6 +137,59 @@
 - **Detailed Metadata**: Request/response data for API calls
 - **Export Functionality**: Export logs for analysis
 
+### 12. Latest Features & Improvements (v1.2+)
+
+#### 12.1 Configurable Scraping Limits
+- **Facebook Posts Limit**: Set maximum number of Facebook posts to retrieve (1-10,000, default: 100)
+- **Instagram Comments Limit**: Set maximum number of Instagram comments to retrieve (1-10,000, default: 100)
+- **Persistent Settings**: Limits saved in Settings → Preferences tab
+- **Production Integration**: Job processor respects configured limits
+- **Cost Control**: Users can control API costs by limiting retrieved data
+
+#### 12.2 Database Connection Testing
+- **Test Connection Button**: Verify Supabase credentials before saving
+- **Real-Time Validation**: Immediate feedback on connection status
+- **Detailed Error Messages**: Clear indication of authentication/connection failures
+- **Response Time Tracking**: Shows database response latency
+- **Safe Validation**: Tests credentials without modifying any data
+
+#### 12.3 Save Preferences Confirmation
+- **Dedicated Save Button**: "Save Preferences" button in Preferences tab
+- **Confirmation Dialog**: Review changes before saving
+- **Success Feedback**: Visual confirmation when preferences are saved
+- **UX Consistency**: Aligned with "Save API Keys" and "Save Database Configuration"
+
+#### 12.4 Enhanced Import/Export
+- **Complete Settings Backup**: Export includes all preferences and limits
+  - LLM and Embedding model selections
+  - Facebook and Instagram scraping limits
+  - All API keys (encrypted)
+  - Database configuration (encrypted)
+  - Demo mode and logging preferences
+- **One-Click Migration**: Import settings file to restore or migrate configuration
+- **Format Standardization**: JSON format for easy editing and version control
+
+#### 12.5 Apify Integration Improvements
+- **Correct Actor Names**: Using official Apify actors
+  - Facebook: `apify/facebook-posts-scraper`
+  - Instagram: `apify/instagram-scraper`
+- **Proper Parameter Usage**: Using `maxItems` instead of deprecated `resultsLimit`
+- **Dynamic Actor Resolution**: Job processor correctly handles different actor IDs
+- **API Key Transmission**: Apify key properly passed from frontend to backend
+
+#### 12.6 Security & Stability Fixes
+- **API Keys Persistence Fix**: Fixed bug where API keys disappeared when saving preferences
+  - Implemented custom storage middleware with automatic encryption/decryption
+  - API keys always decrypted in state for easy access
+  - API keys always encrypted in localStorage for security
+- **Encryption Architecture Improvements**: Transparent encryption during localStorage I/O
+- **Settings State Consistency**: All settings properly persisted and synchronized
+
+#### 12.7 API Testing Enhancements
+- **Simplified Test Scenarios**: Removed actor-specific tests, focus on token validation
+- **Improved Error Messages**: Better feedback on test failures
+- **Test Result Details**: More information in test responses
+
 ---
 
 ## Technology Stack

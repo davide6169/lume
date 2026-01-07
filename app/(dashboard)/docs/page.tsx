@@ -466,6 +466,7 @@ export default function DocsPage() {
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
                     <li>• <strong>Supabase URL:</strong> Your project URL from Supabase dashboard</li>
                     <li>• <strong>Supabase Anon Key:</strong> Your public/anon key from Supabase dashboard</li>
+                    <li>• <strong>Test Connection:</strong> Verify credentials before saving with real-time validation</li>
                     <li>• <strong>Save Confirmation:</strong> Confirmation dialog validates inputs before saving</li>
                     <li>• <strong>Multi-Tenant:</strong> Each user configures their own database</li>
                   </ul>
@@ -491,14 +492,30 @@ export default function DocsPage() {
                     Share your configuration with team members:
                   </p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
-                    <li>• <strong>Export:</strong> Download all settings as JSON file (includes Supabase config)</li>
+                    <li>• <strong>Export:</strong> Download all settings as JSON file (includes API keys, database config, preferences)</li>
                     <li>• <strong>Import:</strong> Upload JSON file to restore settings</li>
+                    <li>• <strong>Complete Backup:</strong> Includes LLM/embedding models, scraping limits, all API keys, Supabase config</li>
                     <li>• <strong>Team Sharing:</strong> Admins can export config for new team members</li>
                     <li>• <strong>Security Warning:</strong> Export shows prominent warning about sensitive credentials</li>
                   </ul>
                   <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900 rounded text-xs">
                     <strong>⚠️ Important:</strong> Exported files contain API keys and database credentials in plain text. Never share exported files publicly or commit them to version control!
                   </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-1">Preferences</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Configure AI models and scraping limits:
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                    <li>• <strong>LLM Model:</strong> Select OpenRouter model for contact extraction (default: mistral-7b-instruct:free)</li>
+                    <li>• <strong>Embedding Model:</strong> Choose Mixedbread model for semantic search (default: mxbai-embed-large-v1)</li>
+                    <li>• <strong>Facebook Posts Limit:</strong> Set max Facebook posts to retrieve (1-10,000, default: 100)</li>
+                    <li>• <strong>Instagram Comments Limit:</strong> Set max Instagram comments to retrieve (1-10,000, default: 100)</li>
+                    <li>• <strong>Save Confirmation:</strong> "Save Preferences" button confirms changes</li>
+                    <li>• <strong>Cost Control:</strong> Lower limits reduce API usage costs</li>
+                  </ul>
                 </div>
 
                 <div className="border-t pt-3">
