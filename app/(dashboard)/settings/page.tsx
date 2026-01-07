@@ -395,6 +395,16 @@ export default function SettingsPage() {
                   >
                     {showKeys['supabase-anon'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleTestDatabase}
+                    disabled={dbTestRunning}
+                    title="Test database connection"
+                  >
+                    {dbTestRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Found in your Supabase dashboard: Settings → API
@@ -411,82 +421,19 @@ export default function SettingsPage() {
                   <li>Create a new project (takes about 2 minutes)</li>
                   <li>Go to Settings → API in your project dashboard</li>
                   <li>Copy the Project URL and anon/public key</li>
-                  <li>Paste them above and click "Test Connection" then "Save Database Configuration"</li>
+                  <li>Paste them above, click Test button (▶), then "Save Database Configuration"</li>
                 </ol>
               </div>
             </div>
 
             {/* Save Button */}
-            <div className="pt-4 border-t space-y-3">
-              {/* Test Connection Button */}
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleTestDatabase}
-                  disabled={dbTestRunning}
-                  variant="outline"
-                  className="flex-1"
-                  size="lg"
-                >
-                  {dbTestRunning ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Testing...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Test Connection
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleSaveSupabaseWithConfirm}
-                  className="flex-1"
-                  size="lg"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Database Configuration
-                </Button>
-              </div>
-
-              {/* Test Result */}
-              {dbTestResult && (
-                <Alert className={dbTestResult.success ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-red-500 bg-red-50 dark:bg-red-950'}>
-                  {dbTestResult.success ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-red-600" />
-                  )}
-                  <AlertDescription className="text-sm">
-                    <div className="font-semibold mb-1">
-                      {dbTestResult.success ? 'Connection Successful' : 'Connection Failed'}
-                    </div>
-                    <div className="text-xs space-y-1">
-                      <p>{dbTestResult.success ? dbTestResult.message : dbTestResult.error}</p>
-                      {dbTestResult.details && (
-                        <div className="mt-2 space-y-1">
-                          {dbTestResult.details.url && (
-                            <p className="text-muted-foreground">URL: {dbTestResult.details.url}</p>
-                          )}
-                          {dbTestResult.details.responseTime && (
-                            <p className="text-muted-foreground">Response time: {dbTestResult.details.responseTime}</p>
-                          )}
-                          {dbTestResult.details.message && !dbTestResult.success && (
-                            <p className="text-red-600 dark:text-red-400">{dbTestResult.details.message}</p>
-                          )}
-                          {dbTestResult.details.status && (
-                            <p className="text-muted-foreground">Status: {dbTestResult.details.status}</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Save message */}
+            <div className="pt-4 border-t">
+              <Button onClick={handleSaveSupabaseWithConfirm} className="w-full" size="lg">
+                <Save className="h-4 w-4 mr-2" />
+                Save Database Configuration
+              </Button>
               {saveMessage && savingType === 'database' && (
-                <p className="text-sm text-center text-muted-foreground">{saveMessage}</p>
+                <p className="text-sm text-center text-muted-foreground mt-2">{saveMessage}</p>
               )}
             </div>
           </Card>
