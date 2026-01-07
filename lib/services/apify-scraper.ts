@@ -186,7 +186,7 @@ export class ApifyScraperService {
         body: JSON.stringify({
           directUrls: [url],
           resultsType: 'comments',
-          resultsLimit: options.limit || 100,
+          maxItems: options.limit || 100,
           addParentData: false,
         }),
       }

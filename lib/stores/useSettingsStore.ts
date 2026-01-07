@@ -20,6 +20,12 @@ interface SettingsState {
   selectedEmbeddingModel: string
   setSelectedEmbeddingModel: (model: string) => void
 
+  // Scraping limits
+  maxItemsFacebook: number
+  setMaxItemsFacebook: (limit: number) => void
+  maxItemsInstagram: number
+  setMaxItemsInstagram: (limit: number) => void
+
   // API Keys (encrypted, stored client-side)
   apiKeys: {
     apify?: string
@@ -59,6 +65,8 @@ const defaultSettings = {
   logsEnabled: true, // Enabled by default in demo mode
   selectedLlmModel: 'mistral-7b-instruct:free',
   selectedEmbeddingModel: 'mxbai-embed-large-v1',
+  maxItemsFacebook: 100,
+  maxItemsInstagram: 100,
   apiKeys: {},
   supabaseConfig: {
     url: '',
@@ -85,6 +93,10 @@ export const useSettingsStore = create<SettingsState>()(
       setSelectedLlmModel: (model) => set({ selectedLlmModel: model }),
 
       setSelectedEmbeddingModel: (model) => set({ selectedEmbeddingModel: model }),
+
+      setMaxItemsFacebook: (limit) => set({ maxItemsFacebook: limit }),
+
+      setMaxItemsInstagram: (limit) => set({ maxItemsInstagram: limit }),
 
       setApiKey: (service, key) => {
         // Encrypt the API key before storing
@@ -133,7 +145,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       exportSettings: () => {
-        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig } = get()
+        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig, maxItemsFacebook, maxItemsInstagram } = get()
         // Decrypt sensitive data before export (WARNING: this still exposes keys!)
         const decryptedApiKeys = decryptApiKeys(apiKeys)
         const decryptedSupabaseConfig = decryptSupabaseConfig(supabaseConfig)
@@ -144,6 +156,8 @@ export const useSettingsStore = create<SettingsState>()(
           selectedLlmModel,
           selectedEmbeddingModel,
           supabaseConfig: decryptedSupabaseConfig,
+          maxItemsFacebook,
+          maxItemsInstagram,
         }
       },
 
@@ -160,6 +174,8 @@ export const useSettingsStore = create<SettingsState>()(
           logsEnabled: settings.logsEnabled ?? (settings.demoMode ?? true), // Default based on demo mode
           selectedLlmModel: settings.selectedLlmModel || 'mistral-7b-instruct:free',
           selectedEmbeddingModel: settings.selectedEmbeddingModel || 'mxbai-embed-large-v1',
+          maxItemsFacebook: settings.maxItemsFacebook ?? 100,
+          maxItemsInstagram: settings.maxItemsInstagram ?? 100,
           supabaseConfig: encryptedSupabaseConfig,
         })
       },
@@ -214,6 +230,8 @@ export const useSettingsStore = create<SettingsState>()(
         logsEnabled: state.logsEnabled,
         selectedLlmModel: state.selectedLlmModel,
         selectedEmbeddingModel: state.selectedEmbeddingModel,
+        maxItemsFacebook: state.maxItemsFacebook,
+        maxItemsInstagram: state.maxItemsInstagram,
         apiKeys: state.apiKeys, // Already encrypted
         supabaseConfig: state.supabaseConfig, // Already encrypted
       }),

@@ -212,6 +212,8 @@ export interface ExportableSettings {
   logsEnabled?: boolean;
   selectedLlmModel?: string;
   selectedEmbeddingModel?: string;
+  maxItemsFacebook?: number;
+  maxItemsInstagram?: number;
   supabaseConfig?: {
     url: string;
     anonKey: string;

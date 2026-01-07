@@ -33,12 +33,13 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     console.log('[Search Job Start] Request body:', JSON.stringify(body, null, 2))
-    const { sourceAudienceIds, mode = 'production', sourceAudiences: clientSourceAudiences, apiKeys: clientApiKeys } = body
+    const { sourceAudienceIds, mode = 'production', sourceAudiences: clientSourceAudiences, apiKeys: clientApiKeys, scrapingLimits } = body
 
     console.log('[Search Job Start] Parsed values:', {
       sourceAudienceIds,
       mode,
-      clientSourceAudiences: clientSourceAudiences ? `Found ${clientSourceAudiences.length} audiences` : 'NOT FOUND'
+      clientSourceAudiences: clientSourceAudiences ? `Found ${clientSourceAudiences.length} audiences` : 'NOT FOUND',
+      scrapingLimits: scrapingLimits ? `Facebook: ${scrapingLimits.facebook}, Instagram: ${scrapingLimits.instagram}` : 'NOT PROVIDED'
     })
 
     if (!sourceAudienceIds || !Array.isArray(sourceAudienceIds) || sourceAudienceIds.length === 0) {
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
       })),
       mode,
       apiKeys: clientApiKeys, // Pass API keys for production mode
+      scrapingLimits, // Pass scraping limits for production mode
       initialUsage: {
         openrouter: initialOpenRouter.data.usage,
         mixedbread: initialMixedbread.data.usage,
@@ -613,6 +615,9 @@ async function processSearchJob(jobId: string, userId: string) {
         console.log(`[JobProcessor] Production mode - starting real API processing`)
 
         const apiKeys = job.payload.apiKeys
+        const scrapingLimits = job.payload.scrapingLimits || { facebook: 100, instagram: 100 }
+
+        console.log('[JobProcessor] Using scraping limits:', scrapingLimits)
 
         // Initialize Apify production service if API key available
         if (apiKeys?.apify) {
@@ -681,7 +686,7 @@ async function processSearchJob(jobId: string, userId: string) {
             console.log('[JobProcessor] Parsed Facebook URL:', parsedUrl)
 
             // Fetch comments from the post using Apify
-            const comments = await apifyService.fetchFacebookComments(parsedUrl.id, { limit: 10 })
+            const comments = await apifyService.fetchFacebookComments(parsedUrl.id, { limit: scrapingLimits.facebook })
 
             console.log('[JobProcessor] Fetched Facebook comments:', comments.length)
 

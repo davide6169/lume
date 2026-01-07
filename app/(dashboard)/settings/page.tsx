@@ -32,6 +32,10 @@ export default function SettingsPage() {
     setSelectedLlmModel,
     selectedEmbeddingModel,
     setSelectedEmbeddingModel,
+    maxItemsFacebook,
+    setMaxItemsFacebook,
+    maxItemsInstagram,
+    setMaxItemsInstagram,
     apiKeys,
     setApiKey,
     removeApiKey,
@@ -506,6 +510,48 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">
                 Default model is mxbai-embed-large-v1. This model is used for semantic search and contact similarity analysis.
               </p>
+            </div>
+          </Card>
+
+          {/* Scraping Limits Settings */}
+          <Card className="p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold">Scraping Limits</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure maximum number of items to retrieve from Facebook and Instagram
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="max-items-facebook">Facebook Posts Limit</Label>
+                <Input
+                  id="max-items-facebook"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={maxItemsFacebook}
+                  onChange={(e) => setMaxItemsFacebook(Math.max(1, Math.min(10000, parseInt(e.target.value) || 100)))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum number of Facebook posts to retrieve (default: 100, max: 10,000)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="max-items-instagram">Instagram Comments Limit</Label>
+                <Input
+                  id="max-items-instagram"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={maxItemsInstagram}
+                  onChange={(e) => setMaxItemsInstagram(Math.max(1, Math.min(10000, parseInt(e.target.value) || 100)))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum number of Instagram comments to retrieve (default: 100, max: 10,000)
+                </p>
+              </div>
             </div>
           </Card>
         </TabsContent>
