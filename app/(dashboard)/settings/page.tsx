@@ -86,7 +86,7 @@ export default function SettingsPage() {
   // API Keys save confirmation dialog
   const [saveConfirmDialog, setSaveConfirmDialog] = useState(false)
   const [savedKeysCount, setSavedKeysCount] = useState(0)
-  const [savingType, setSavingType] = useState<'api-keys' | 'database'>('api-keys')
+  const [savingType, setSavingType] = useState<'api-keys' | 'database' | 'preferences'>('api-keys')
 
   const handleSaveKeys = () => {
     let count = 0
@@ -136,9 +136,19 @@ export default function SettingsPage() {
     setSaveConfirmDialog(true)
   }
 
+  const handleSavePreferences = () => {
+    // Preferences are automatically saved by Zustand persist
+    // Just show confirmation dialog
+    setSavingType('preferences')
+    setSaveConfirmDialog(true)
+  }
+
   const confirmSave = () => {
     if (savingType === 'database') {
       handleSaveSupabase()
+    } else if (savingType === 'preferences') {
+      setSaveMessage('✅ Preferences have been saved successfully!')
+      setTimeout(() => setSaveMessage(''), 3000)
     } else {
       const count = savedKeysCount
       if (count > 0) {
@@ -554,6 +564,17 @@ export default function SettingsPage() {
               </div>
             </div>
           </Card>
+
+          {/* Save Preferences Button */}
+          <Card className="p-6">
+            <Button onClick={handleSavePreferences} className="w-full">
+              <Save className="mr-2 h-4 w-4" />
+              Save Preferences
+            </Button>
+            {saveMessage && (
+              <p className="text-sm text-center mt-3 text-muted-foreground">{saveMessage}</p>
+            )}
+          </Card>
         </TabsContent>
 
         {/* Import/Export Tab */}
@@ -779,11 +800,15 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              {savingType === 'database' ? 'Save Database Configuration' : 'Save API Keys'}
+              {savingType === 'database' ? 'Save Database Configuration' :
+               savingType === 'preferences' ? 'Save Preferences' :
+               'Save API Keys'}
             </DialogTitle>
             <DialogDescription>
               {savingType === 'database'
                 ? 'Are you sure you want to save your Supabase database configuration? This will update your connection settings.'
+                : savingType === 'preferences'
+                ? 'Your preferences will be saved to your browser storage. This includes LLM models, embedding settings, and scraping limits.'
                 : (savedKeysCount === 1
                   ? '1 API key will be saved to your browser storage.'
                   : `${savedKeysCount} API keys will be saved to your browser storage.`
