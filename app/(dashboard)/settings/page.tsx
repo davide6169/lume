@@ -733,7 +733,7 @@ export default function SettingsPage() {
                   className="w-full"
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  Import Settings from File
+                  Import Settings
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">
                   Select a JSON file previously exported from Lume
