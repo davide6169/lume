@@ -214,6 +214,7 @@ export interface ExportableSettings {
   selectedEmbeddingModel?: string;
   maxItemsFacebook?: number;
   maxItemsInstagram?: number;
+  logRetentionDays?: number;
   supabaseConfig?: {
     url: string;
     anonKey: string;

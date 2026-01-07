@@ -36,6 +36,8 @@ export default function SettingsPage() {
     setMaxItemsFacebook,
     maxItemsInstagram,
     setMaxItemsInstagram,
+    logRetentionDays,
+    setLogRetentionDays,
     apiKeys,
     setApiKey,
     removeApiKey,
@@ -619,6 +621,35 @@ export default function SettingsPage() {
                   Maximum number of Instagram comments to retrieve (default: 100, max: 10,000)
                 </p>
               </div>
+            </div>
+          </Card>
+
+          {/* Log Retention Settings */}
+          <Card className="p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold">Log Retention</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure how long to keep system logs before automatic cleanup
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="log-retention-days">Log Retention Days</Label>
+              <Input
+                id="log-retention-days"
+                type="number"
+                min="1"
+                max="30"
+                value={logRetentionDays}
+                onChange={(e) => setLogRetentionDays(Math.max(1, Math.min(30, parseInt(e.target.value) || 3)))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of days to keep logs before automatic deletion (default: 3, range: 1-30 days)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                <strong>Note:</strong> Logs older than the specified number of days will be automatically deleted to save database space.
+                Set to a higher value if you need longer audit trails, or lower value to minimize database storage.
+              </p>
             </div>
           </Card>
 

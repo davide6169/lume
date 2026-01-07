@@ -29,6 +29,10 @@ interface SettingsState {
   maxItemsInstagram: number
   setMaxItemsInstagram: (limit: number) => void
 
+  // Log retention
+  logRetentionDays: number
+  setLogRetentionDays: (days: number) => void
+
   // API Keys (encrypted in localStorage, decrypted in state)
   apiKeys: {
     apify?: string
@@ -70,6 +74,7 @@ const defaultSettings = {
   selectedEmbeddingModel: 'mxbai-embed-large-v1',
   maxItemsFacebook: 100,
   maxItemsInstagram: 100,
+  logRetentionDays: 3, // Keep logs for 3 days by default
   apiKeys: {},
   supabaseConfig: {
     url: '',
@@ -100,6 +105,8 @@ export const useSettingsStore = create<SettingsState>()(
       setMaxItemsFacebook: (limit) => set({ maxItemsFacebook: limit }),
 
       setMaxItemsInstagram: (limit) => set({ maxItemsInstagram: limit }),
+
+      setLogRetentionDays: (days) => set({ logRetentionDays: days }),
 
       setApiKey: (service, key) => {
         // Store the API key as-is (will be encrypted by storage middleware)
@@ -145,7 +152,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       exportSettings: () => {
-        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig, maxItemsFacebook, maxItemsInstagram } = get()
+        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig, maxItemsFacebook, maxItemsInstagram, logRetentionDays } = get()
         // Data is now always decrypted in state (WARNING: this still exposes keys in export!)
         return {
           apiKeys,
@@ -156,6 +163,7 @@ export const useSettingsStore = create<SettingsState>()(
           supabaseConfig,
           maxItemsFacebook,
           maxItemsInstagram,
+          logRetentionDays,
         }
       },
 
@@ -169,6 +177,7 @@ export const useSettingsStore = create<SettingsState>()(
           selectedEmbeddingModel: settings.selectedEmbeddingModel || 'mxbai-embed-large-v1',
           maxItemsFacebook: settings.maxItemsFacebook ?? 100,
           maxItemsInstagram: settings.maxItemsInstagram ?? 100,
+          logRetentionDays: settings.logRetentionDays ?? 3,
           supabaseConfig: settings.supabaseConfig || { url: '', anonKey: '' },
         })
       },

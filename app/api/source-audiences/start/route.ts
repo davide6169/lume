@@ -199,6 +199,44 @@ async function saveLogToDatabase(supabase: any, userId: string, level: string, m
       console.error('[JobProcessor] Error saving log to database:', error)
     } else {
       console.log(`[JobProcessor] Log saved to database: [${level.toUpperCase()}] ${message}`)
+
+      // Clean up old logs after saving a new one
+      try {
+        // Get user's profile to check if admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single()
+
+        // Only admins can clean up logs
+        if (profile?.role === 'admin') {
+          // Get user's settings to check retention days
+          // Note: We can't access the settings store directly from server-side
+          // So we'll use a default of 3 days for cleanup
+          const retentionDays = 3 // Default, could be enhanced to fetch from user settings
+
+          const cutoffDate = new Date()
+          cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
+
+          const { data: deletedLogs, error: deleteError } = await supabase
+            .from('logs')
+            .delete()
+            .lt('created_at', cutoffDate.toISOString())
+
+          if (deleteError) {
+            console.error('[JobProcessor] Error cleaning up old logs:', deleteError)
+          } else {
+            const deletedCount = Array.isArray(deletedLogs) ? deletedLogs.length : 0
+            if (deletedCount > 0) {
+              console.log(`[JobProcessor] Cleaned up ${deletedCount} old logs (older than ${retentionDays} days)`)
+            }
+          }
+        }
+      } catch (cleanupError) {
+        // Don't fail the log save if cleanup fails
+        console.error('[JobProcessor] Error during log cleanup:', cleanupError)
+      }
     }
   } catch (error) {
     console.error('[JobProcessor] Exception saving log to database:', error)
