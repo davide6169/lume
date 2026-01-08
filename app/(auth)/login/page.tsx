@@ -19,7 +19,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-20 h-20">
+            <div className="w-64 h-64">
               <LumeLogo className="w-full h-full" showTagline={true} />
             </div>
           </div>

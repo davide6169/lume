@@ -7,7 +7,7 @@ import { ApolloEnrichmentStubService } from '@/lib/services/apollo-enrichment-st
 import { createHunterIoService } from '@/lib/services/hunter-io'
 import { createOpenRouterService } from '@/lib/services/openrouter'
 import { createMixedbreadService } from '@/lib/services/mixedbread'
-import { MetaGraphAPIService } from '@/lib/services/meta-graphapi'
+import { ApifyScraperService } from '@/lib/services/apify-scraper'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -33,12 +33,13 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     console.log('[Search Job Start] Request body:', JSON.stringify(body, null, 2))
-    const { sourceAudienceIds, mode = 'production', sourceAudiences: clientSourceAudiences, apiKeys: clientApiKeys } = body
+    const { sourceAudienceIds, mode = 'production', sourceAudiences: clientSourceAudiences, apiKeys: clientApiKeys, scrapingLimits } = body
 
     console.log('[Search Job Start] Parsed values:', {
       sourceAudienceIds,
       mode,
-      clientSourceAudiences: clientSourceAudiences ? `Found ${clientSourceAudiences.length} audiences` : 'NOT FOUND'
+      clientSourceAudiences: clientSourceAudiences ? `Found ${clientSourceAudiences.length} audiences` : 'NOT FOUND',
+      scrapingLimits: scrapingLimits ? `Facebook: ${scrapingLimits.facebook}, Instagram: ${scrapingLimits.instagram}` : 'NOT PROVIDED'
     })
 
     if (!sourceAudienceIds || !Array.isArray(sourceAudienceIds) || sourceAudienceIds.length === 0) {
@@ -84,13 +85,13 @@ export async function POST(request: Request) {
       initialMixedbread,
       initialApollo,
       initialHunter,
-      initialMeta
+      initialApify
     ] = await Promise.all([
       usageService.getOpenRouterUsage(),
       usageService.getMixedbreadUsage(),
       usageService.getApolloUsage(),
       usageService.getHunterUsage(),
-      usageService.getMetaUsage()
+      usageService.getApifyUsage()
     ])
 
     console.log('[Search Job Start] Initial API usage captured')
@@ -106,12 +107,13 @@ export async function POST(request: Request) {
       })),
       mode,
       apiKeys: clientApiKeys, // Pass API keys for production mode
+      scrapingLimits, // Pass scraping limits for production mode
       initialUsage: {
         openrouter: initialOpenRouter.data.usage,
         mixedbread: initialMixedbread.data.usage,
         apollo: initialApollo.data,
         hunter: initialHunter.data,
-        meta: initialMeta.data.usage
+        apify: initialApify.data.usage
       }
     })
 
@@ -177,6 +179,68 @@ function shuffleArray<T>(array: T[]): T[] {
     ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
   return shuffled
+}
+
+/**
+ * Save log entry to database
+ */
+async function saveLogToDatabase(supabase: any, userId: string, level: string, message: string, metadata: any) {
+  try {
+    const { error } = await supabase
+      .from('logs')
+      .insert({
+        user_id: userId,
+        level,
+        message,
+        metadata
+      })
+
+    if (error) {
+      console.error('[JobProcessor] Error saving log to database:', error)
+    } else {
+      console.log(`[JobProcessor] Log saved to database: [${level.toUpperCase()}] ${message}`)
+
+      // Clean up old logs after saving a new one
+      try {
+        // Get user's profile to check if admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single()
+
+        // Only admins can clean up logs
+        if (profile?.role === 'admin') {
+          // Get user's settings to check retention days
+          // Note: We can't access the settings store directly from server-side
+          // So we'll use a default of 3 days for cleanup
+          const retentionDays = 3 // Default, could be enhanced to fetch from user settings
+
+          const cutoffDate = new Date()
+          cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
+
+          const { data: deletedLogs, error: deleteError } = await supabase
+            .from('logs')
+            .delete()
+            .lt('created_at', cutoffDate.toISOString())
+
+          if (deleteError) {
+            console.error('[JobProcessor] Error cleaning up old logs:', deleteError)
+          } else {
+            const deletedCount = Array.isArray(deletedLogs) ? deletedLogs.length : 0
+            if (deletedCount > 0) {
+              console.log(`[JobProcessor] Cleaned up ${deletedCount} old logs (older than ${retentionDays} days)`)
+            }
+          }
+        }
+      } catch (cleanupError) {
+        // Don't fail the log save if cleanup fails
+        console.error('[JobProcessor] Error during log cleanup:', cleanupError)
+      }
+    }
+  } catch (error) {
+    console.error('[JobProcessor] Exception saving log to database:', error)
+  }
 }
 
 /**
@@ -255,6 +319,29 @@ async function processSearchJob(jobId: string, userId: string) {
           })
 
           await new Promise(resolve => setTimeout(resolve, 1500))
+
+          // Simulate Apify web scraping for each URL
+          let totalFetchedResults = 0
+          for (let j = 0; j < audience.urls.length; j++) {
+            await new Promise(resolve => setTimeout(resolve, 300))
+
+            // Simulate Apify scraping results
+            const resultsPerUrl = 20 + Math.floor(Math.random() * 30) // 20-50 results per URL
+            usageService.simulateApifyCall(resultsPerUrl)
+            totalFetchedResults += resultsPerUrl
+
+            update(audienceProgress - 5 + (j / audience.urls.length) * 1, {
+              timestamp: new Date().toISOString(),
+              event: 'APIFY_FETCH_COMPLETED',
+              details: {
+                url: audience.urls[j],
+                urlIndex: j + 1,
+                provider: 'Apify',
+                platform: audience.type === 'facebook' ? 'Facebook' : 'Instagram',
+                resultsFetched: resultsPerUrl
+              }
+            })
+          }
 
           // Simulate LLM extraction for each URL
           let totalDraftContacts = 0
@@ -459,12 +546,12 @@ async function processSearchJob(jobId: string, userId: string) {
         })
 
         // Calculate API costs
-        const [finalOpenRouter, finalMixedbread, finalApollo, finalHunter, finalMeta] = await Promise.all([
+        const [finalOpenRouter, finalMixedbread, finalApollo, finalHunter, finalApify] = await Promise.all([
           usageService.getOpenRouterUsage(),
           usageService.getMixedbreadUsage(),
           usageService.getApolloUsage(),
           usageService.getHunterUsage(),
-          usageService.getMetaUsage()
+          usageService.getApifyUsage()
         ])
 
         // Calculate costs by comparing initial and final usage
@@ -553,6 +640,26 @@ async function processSearchJob(jobId: string, userId: string) {
             }
           }
 
+          // Apify cost (Facebook/Instagram scraping)
+          if (currentJob.payload.initialUsage?.apify && finalApify.data) {
+            const initialResults = currentJob.payload.initialUsage.apify.results_fetched || 0
+            const finalResults = finalApify.data.usage.results_fetched || 0
+            const resultsFetched = finalResults - initialResults
+            if (resultsFetched > 0) {
+              // Use average pricing (mix of Facebook and Instagram)
+              // Instagram: $1.50/1000 results, Facebook: $5.00/100 results
+              // Average: ~$0.003 per result for estimation
+              const cost = resultsFetched * 0.003
+              costs.push({
+                service: 'apify',
+                operation: 'Web Scraping',
+                cost,
+                units: resultsFetched,
+                unitType: 'results'
+              })
+            }
+          }
+
           // Meta is free
           costs.push({
             service: 'meta',
@@ -608,88 +715,114 @@ async function processSearchJob(jobId: string, userId: string) {
 
         // Reset usage counters for next job
         usageService.resetUsage()
+
+        // Save job log to database (demo mode)
+        const currentJob = jobProcessor.getJob(jobId)
+        if (currentJob) {
+          await saveLogToDatabase(
+            supabase,
+            userId,
+            'info',
+            `Search job completed - Found ${currentJob.result?.data?.totalContacts || 0} contacts from ${currentJob.result?.data?.sharedAudiences?.length || 0} audience(s)`,
+            {
+              jobId: currentJob.id,
+              jobType: currentJob.type,
+              status: currentJob.status,
+              progress: currentJob.progress,
+              timeline: currentJob.timeline,
+              result: {
+                totalContacts: currentJob.result?.data?.totalContacts,
+                sharedAudiencesCreated: currentJob.result?.data?.sharedAudiences?.length || 0,
+                totalCost: currentJob.result?.data?.totalCost
+              }
+            }
+          )
+        }
       } else {
         // Production processing - call real APIs
         console.log(`[JobProcessor] Production mode - starting real API processing`)
 
         const apiKeys = job.payload.apiKeys
+        const scrapingLimits = job.payload.scrapingLimits || { facebook: 100, instagram: 100 }
 
-        // Initialize Meta GraphAPI production service if API key available
-        if (apiKeys?.meta) {
-          const metaService = new MetaGraphAPIService(apiKeys.meta)
-          console.log('[JobProcessor] Meta GraphAPI production service initialized')
+        console.log('[JobProcessor] Using scraping limits:', scrapingLimits)
+
+        // Initialize Apify production service if API key available
+        if (apiKeys?.apify) {
+          const apifyService = new ApifyScraperService(apiKeys.apify)
+          console.log('[JobProcessor] Apify production service initialized')
 
           // Validate token
           update(10, {
             timestamp: new Date().toISOString(),
-            event: 'META_TOKEN_VALIDATION_STARTED',
+            event: 'APIFY_TOKEN_VALIDATION_STARTED',
             details: {
-              provider: 'Meta GraphAPI',
-              task: 'Validate access token'
+              provider: 'Apify',
+              task: 'Validate API token'
             }
           })
 
           try {
-            const tokenValidation = await metaService.validateToken()
+            const tokenValidation = await apifyService.validateToken()
 
             if (tokenValidation.valid) {
-              console.log('[JobProcessor] Meta token valid:', tokenValidation.appName)
+              console.log('[JobProcessor] Apify token valid:', tokenValidation.appName)
 
               update(15, {
                 timestamp: new Date().toISOString(),
-                event: 'META_TOKEN_VALIDATED',
+                event: 'APIFY_TOKEN_VALIDATED',
                 details: {
-                  provider: 'Meta GraphAPI',
-                  appName: tokenValidation.appName || 'Unknown App',
+                  provider: 'Apify',
+                  appName: tokenValidation.appName || 'Apify',
                   status: 'valid'
                 }
               })
             } else {
-              console.error('[JobProcessor] Meta token invalid:', tokenValidation.error)
+              console.error('[JobProcessor] Apify token invalid:', tokenValidation.error)
 
               update(15, {
                 timestamp: new Date().toISOString(),
-                event: 'META_TOKEN_INVALID',
+                event: 'APIFY_TOKEN_INVALID',
                 details: {
-                  provider: 'Meta GraphAPI',
+                  provider: 'Apify',
                   error: tokenValidation.error
                 }
               })
 
-              throw new Error(`Meta token validation failed: ${tokenValidation.error}`)
+              throw new Error(`Apify token validation failed: ${tokenValidation.error}`)
             }
           } catch (error) {
-            console.error('[JobProcessor] Exception during Meta token validation:', error)
+            console.error('[JobProcessor] Exception during Apify token validation:', error)
             throw error
           }
 
-          // Demonstrate Facebook post fetching
+          // Demonstrate Facebook post fetching with Apify
           const sampleFacebookUrl = 'https://www.facebook.com/20531316728/posts/10158264921766728/'
 
           update(20, {
             timestamp: new Date().toISOString(),
-            event: 'META_FETCH_STARTED',
+            event: 'APIFY_FETCH_STARTED',
             details: {
-              provider: 'Meta GraphAPI',
+              provider: 'Apify',
               platform: 'Facebook',
               url: sampleFacebookUrl
             }
           })
 
           try {
-            const parsedUrl = metaService.parseUrl(sampleFacebookUrl)
+            const parsedUrl = apifyService.parseUrl(sampleFacebookUrl)
             console.log('[JobProcessor] Parsed Facebook URL:', parsedUrl)
 
-            // Fetch comments from the post
-            const comments = await metaService.fetchFacebookComments(parsedUrl.id, { limit: 10 })
+            // Fetch comments from the post using Apify
+            const comments = await apifyService.fetchFacebookComments(parsedUrl.id, { limit: scrapingLimits.facebook })
 
             console.log('[JobProcessor] Fetched Facebook comments:', comments.length)
 
             update(25, {
               timestamp: new Date().toISOString(),
-              event: 'META_FETCH_COMPLETED',
+              event: 'APIFY_FETCH_COMPLETED',
               details: {
-                provider: 'Meta GraphAPI',
+                provider: 'Apify',
                 platform: 'Facebook',
                 resourceType: 'post comments',
                 commentsFetched: comments.length,
@@ -700,18 +833,19 @@ async function processSearchJob(jobId: string, userId: string) {
               }
             })
           } catch (error) {
-            console.error('[JobProcessor] Exception during Meta GraphAPI fetch:', error)
+            console.error('[JobProcessor] Exception during Apify fetch:', error)
             update(25, {
               timestamp: new Date().toISOString(),
-              event: 'META_FETCH_FAILED',
+              event: 'APIFY_FETCH_FAILED',
               details: {
-                provider: 'Meta GraphAPI',
+                provider: 'Apify',
                 error: error instanceof Error ? error.message : 'Unknown error'
               }
             })
           }
         } else {
-          console.log('[JobProcessor] No Meta API key provided, skipping Meta GraphAPI integration')
+          console.log('[JobProcessor] No Apify API key provided, skipping Apify integration')
+          throw new Error('Apify API key is required for production mode. Please configure it in Settings.')
         }
 
         // Continue with other services...
@@ -1124,6 +1258,24 @@ Email: luca.verdi@techcorp.com`
         } else {
           console.log('[JobProcessor] No Mixedbread API key provided, skipping Mixedbread integration')
         }
+
+        // Save job log to database (production mode)
+        const currentJob = jobProcessor.getJob(jobId)
+        if (currentJob) {
+          await saveLogToDatabase(
+            supabase,
+            userId,
+            'info',
+            `Search job completed - Production mode`,
+            {
+              jobId: currentJob.id,
+              jobType: currentJob.type,
+              status: currentJob.status,
+              progress: currentJob.progress,
+              timeline: currentJob.timeline
+            }
+          )
+        }
       }
     })
 
@@ -1131,6 +1283,23 @@ Email: luca.verdi@techcorp.com`
     console.log(`Job ${jobId} completed successfully`)
   } catch (error) {
     console.error(`Job ${jobId} failed:`, error)
+
+    // Save error log to database
+    const failedJob = jobProcessor.getJob(jobId)
+    const supabase = await createSupabaseServerClient()
+    await saveLogToDatabase(
+      supabase,
+      userId,
+      'error',
+      `Search job failed - ${error instanceof Error ? error.message : 'Unknown error'}`,
+      {
+        jobId,
+        jobType: 'SEARCH',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timeline: failedJob?.timeline || []
+      }
+    )
+
     throw error
   }
 }

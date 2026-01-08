@@ -28,6 +28,21 @@ export interface ApiServiceTests {
  * Test scenarios for each API service
  */
 export const apiTestDefinitions: ApiServiceTests = {
+  apify: [
+    {
+      id: 'verify-token',
+      name: 'Verify API Token',
+      description: 'Validate Apify API token by fetching user info',
+      endpoint: 'https://api.apify.com/v2/users/me',
+      method: 'GET',
+      expectedOutcome: {
+        success: true,
+        statusCodes: [200],
+        contains: ['data', 'id', 'username'],
+      },
+    },
+  ],
+
   meta: [
     {
       id: 'get-page-info',

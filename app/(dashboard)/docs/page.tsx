@@ -466,6 +466,16 @@ export default function DocsPage() {
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
                     <li>• <strong>Supabase URL:</strong> Your project URL from Supabase dashboard</li>
                     <li>• <strong>Supabase Anon Key:</strong> Your public/anon key from Supabase dashboard</li>
+                    <li>• <strong>Test Connection (▶):</strong> Icon button next to anon key field</li>
+                    <li>• <strong>Test Dialog:</strong> Shows real-time validation with loading spinner</li>
+                    <li>• <strong>Success/Failure:</strong> Green (success) or red (failure) with detailed info:
+                      <ul className="ml-6 mt-1 space-y-0.5">
+                        <li>– Connection status message</li>
+                        <li>– Supabase URL (credentials masked)</li>
+                        <li>– Response time</li>
+                        <li>– Detailed error messages if failed</li>
+                      </ul>
+                    </li>
                     <li>• <strong>Save Confirmation:</strong> Confirmation dialog validates inputs before saving</li>
                     <li>• <strong>Multi-Tenant:</strong> Each user configures their own database</li>
                   </ul>
@@ -477,11 +487,11 @@ export default function DocsPage() {
                     Add your API keys for production mode:
                   </p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                    <li>• <strong>Apify:</strong> For Facebook/Instagram web scraping (Recommended)</li>
                     <li>• <strong>OpenRouter:</strong> For LLM-based contact extraction</li>
                     <li>• <strong>Mixedbread:</strong> For embedding generation</li>
                     <li>• <strong>Apollo.io:</strong> For contact enrichment</li>
                     <li>• <strong>Hunter.io:</strong> For email verification</li>
-                    <li>• <strong>Meta GraphAPI:</strong> For Facebook/Instagram data</li>
                   </ul>
                 </div>
 
@@ -491,14 +501,32 @@ export default function DocsPage() {
                     Share your configuration with team members:
                   </p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
-                    <li>• <strong>Export:</strong> Download all settings as JSON file (includes Supabase config)</li>
+                    <li>• <strong>Export:</strong> Download all settings as JSON file (includes API keys, database config, preferences)</li>
                     <li>• <strong>Import:</strong> Upload JSON file to restore settings</li>
+                    <li>• <strong>Complete Backup:</strong> Includes LLM/embedding models, source data limits, all API keys, Supabase config</li>
                     <li>• <strong>Team Sharing:</strong> Admins can export config for new team members</li>
                     <li>• <strong>Security Warning:</strong> Export shows prominent warning about sensitive credentials</li>
                   </ul>
                   <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900 rounded text-xs">
                     <strong>⚠️ Important:</strong> Exported files contain API keys and database credentials in plain text. Never share exported files publicly or commit them to version control!
                   </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold mb-1">Preferences</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Configure AI models, source data limits, and log retention:
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                    <li>• <strong>LLM Model:</strong> Select OpenRouter model for contact extraction (default: mistral-7b-instruct:free)</li>
+                    <li>• <strong>Embedding Model:</strong> Choose Mixedbread model for semantic search (default: mxbai-embed-large-v1)</li>
+                    <li>• <strong>Facebook Posts Limit:</strong> Set max Facebook posts to retrieve (1-10,000, default: 100)</li>
+                    <li>• <strong>Instagram Comments Limit:</strong> Set max Instagram comments to retrieve (1-10,000, default: 100)</li>
+                    <li>• <strong>Log Retention Days:</strong> Configure how long to keep system logs (1-30 days, default: 3)</li>
+                    <li>• <strong>Automatic Cleanup:</strong> Logs older than retention period are automatically deleted</li>
+                    <li>• <strong>Save Confirmation:</strong> "Save Preferences" button confirms changes</li>
+                    <li>• <strong>Cost Control:</strong> Lower limits reduce API usage costs</li>
+                  </ul>
                 </div>
 
                 <div className="border-t pt-3">
@@ -527,10 +555,25 @@ export default function DocsPage() {
               <div className="text-sm text-muted-foreground space-y-2">
                 <p>View detailed logs of all operations including:</p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>Job processing timeline</li>
-                  <li>API calls and responses</li>
-                  <li>Contact filtering and enrichment</li>
-                  <li>Errors and warnings</li>
+                  <li><strong>Automatic Job Logging:</strong> Jobs automatically save logs to database on completion</li>
+                  <li><strong>Automatic Log Cleanup:</strong> Old logs deleted based on retention policy (default: 3 days)</li>
+                  <li><strong>Configurable Retention:</strong> Set how long to keep logs in Settings → Preferences</li>
+                  <li><strong>Complete Timeline:</strong> All job events captured including:
+                    <ul className="ml-6 mt-1 space-y-0.5">
+                      <li>– Apify token validation events</li>
+                      <li>– Facebook/Instagram scraping events</li>
+                      <li>– LLM extraction events</li>
+                      <li>– Contact enrichment events</li>
+                      <li>– All other timeline events</li>
+                    </ul>
+                  </li>
+                  <li><strong>Error Logging:</strong> Failed jobs automatically save error logs with timeline</li>
+                  <li><strong>Always Persisted:</strong> Logs saved even if user is not on the page when job completes</li>
+                  <li><strong>Admin Only:</strong> Logs accessible via Settings → Logs (admin only)</li>
+                  <li><strong>Log Details:</strong> Each log includes job ID, type, status, progress, full timeline, and results</li>
+                  <li><strong>Interactive Display:</strong> Click log cards to expand and view full details</li>
+                  <li><strong>Export:</strong> Export individual logs or all logs to TXT files</li>
+                  <li><strong>Filter:</strong> Filter logs by level (error, warn, info, debug)</li>
                 </ul>
                 <p className="mt-2">
                   <Badge variant="secondary">Admin Only</Badge>
@@ -570,6 +613,56 @@ export default function DocsPage() {
                 <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
                   <p className="text-xs">
                     <strong>Demo Mode Data:</strong> When Demo mode is ON, this page shows 4 dummy users (1 admin + 3 users with 2 pending) to demonstrate the approval workflow without real data.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Dashboard & Cost Tracking</CardTitle>
+              <CardDescription>Monitor your statistics and API costs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p><strong>Dashboard Overview:</strong></p>
+                <ul className="list-disc list-inside space-y-1 ml-4">
+                  <li><strong>Source Audiences:</strong> Total number of Facebook/Instagram source audiences created</li>
+                  <li><strong>Total URLs:</strong> Combined count of all URLs across source audiences</li>
+                  <li><strong>Contacts Found:</strong> Total contacts extracted from all sources</li>
+                  <li><strong>Uploaded to Meta:</strong> Number of audiences uploaded to Meta Custom Audiences</li>
+                  <li><strong>Total Cost:</strong> Complete cost breakdown including all paid services</li>
+                </ul>
+
+                <p className="mt-3"><strong>Cost Tracking:</strong></p>
+                <ul className="list-disc list-inside space-y-1 ml-4">
+                  <li><strong>All Services Tracked:</strong>
+                    <ul className="ml-6 mt-1 space-y-0.5">
+                      <li>– OpenRouter (LLM contact extraction)</li>
+                      <li>– Mixedbread AI (Vector embeddings)</li>
+                      <li>– Apollo.io (Contact enrichment)</li>
+                      <li>– Hunter.io (Email finder + verifier)</li>
+                      <li>– Apify (Facebook/Instagram web scraping) ✅</li>
+                      <li>– Meta GraphAPI (Free)</li>
+                    </ul>
+                  </li>
+                  <li><strong>Real-Time Updates:</strong> Costs update automatically as jobs complete</li>
+                  <li><strong>Detailed Breakdown:</strong> Cost breakdown by service with percentage distribution</li>
+                  <li><strong>Visual Charts:</strong> Color-coded bars showing cost distribution</li>
+                  <li><strong>Persistent Storage:</strong> Costs saved to database for historical tracking</li>
+                  <li><strong>Recent Activity:</strong> 7-day activity chart showing API usage patterns</li>
+                </ul>
+
+                <div className="mt-3 p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                  <p className="text-xs">
+                    <strong>Apify Cost Tracking:</strong> Web scraping costs for Facebook and Instagram are now accurately tracked and included in the Total Cost. Costs are calculated based on results fetched (~$0.003 per result average for FB/IG).
+                  </p>
+                </div>
+
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                  <p className="text-xs">
+                    <strong>Demo Mode:</strong> Shows realistic demo data with simulated costs for all services. Perfect for exploring the platform without spending real credits.
                   </p>
                 </div>
               </div>
@@ -737,7 +830,7 @@ export default function DocsPage() {
                 <div className="p-3 border rounded-lg">
                   <h4 className="font-semibold mb-2">Data Pipeline</h4>
                   <div className="text-sm space-y-1">
-                    <p><strong>1. Meta GraphAPI:</strong> Fetch posts/comments from FB/IG</p>
+                    <p><strong>1. Apify Scrapers:</strong> Fetch posts/comments from FB/IG</p>
                     <p><strong>2. OpenRouter LLM:</strong> Extract contact information (Claude 3.5 Sonnet)</p>
                     <p><strong>3. Contact Filtering:</strong> Separate complete vs partial contacts</p>
                     <p><strong>4. Hunter Email Finder:</strong> Find missing emails</p>
@@ -754,8 +847,8 @@ export default function DocsPage() {
                     <div className="flex items-start gap-2">
                       <Database className="h-4 w-4 mt-0.5 text-blue-600" />
                       <div>
-                        <span className="font-semibold">Meta GraphAPI</span>
-                        <span className="text-muted-foreground"> - Facebook/Instagram data</span>
+                        <span className="font-semibold">Apify</span>
+                        <span className="text-muted-foreground"> - Web scraping for FB/IG</span>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -804,6 +897,8 @@ export default function DocsPage() {
                   <div className="text-sm text-muted-foreground space-y-2">
                     <p><strong>API Costs (per contact):</strong></p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li>Apify (Instagram): $1.50 per 1,000 results</li>
+                      <li>Apify (Facebook): ~$5 per 100 results</li>
                       <li>OpenRouter LLM: ~$0.0001 - $0.001 per extraction</li>
                       <li>Mixedbread Embeddings: ~$0.00001 per embedding</li>
                       <li>Apollo Enrichment: ~$0.01 - $0.05 per contact</li>
@@ -892,11 +987,11 @@ export default function DocsPage() {
                   <div className="text-sm text-muted-foreground space-y-2">
                     <p>After configuring your database, navigate to <strong>Settings → API Keys</strong> to add more services:</p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li><strong>Apify:</strong> Your API token for Facebook/Instagram scraping</li>
                       <li><strong>OpenRouter:</strong> Your API key for LLM extraction</li>
                       <li><strong>Mixedbread:</strong> Your API key for embeddings</li>
                       <li><strong>Apollo.io:</strong> Your API key for contact enrichment</li>
                       <li><strong>Hunter.io:</strong> Your API key for email verification</li>
-                      <li><strong>Meta:</strong> Your app credentials for Facebook/Instagram</li>
                     </ul>
                   </div>
                 </div>
@@ -921,11 +1016,11 @@ export default function DocsPage() {
                 <div className="border-t pt-3">
                   <h4 className="font-semibold mb-2">Getting API Keys</h4>
                   <div className="text-sm text-muted-foreground space-y-2">
+                    <p><strong>Apify:</strong> Get token at <a href="https://apify.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">apify.com</a></p>
                     <p><strong>OpenRouter:</strong> Get key at <a href="https://openrouter.ai" target="_blank" rel="noopener" className="text-blue-600 hover:underline">openrouter.ai</a></p>
                     <p><strong>Mixedbread:</strong> Get key at <a href="https://www.mixedbread.ai" target="_blank" rel="noopener" className="text-blue-600 hover:underline">mixedbread.ai</a></p>
                     <p><strong>Apollo.io:</strong> Get key at <a href="https://www.apollo.io" target="_blank" rel="noopener" className="text-blue-600 hover:underline">apollo.io</a></p>
                     <p><strong>Hunter.io:</strong> Get key at <a href="https://hunter.io" target="_blank" rel="noopener" className="text-blue-600 hover:underline">hunter.io</a></p>
-                    <p><strong>Meta:</strong> Create app at <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">developers.facebook.com</a></p>
                     <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-950 rounded text-xs">
                       <strong>Note:</strong> Supabase configuration is handled in Step 2 when you disable Demo mode.
                     </div>
@@ -959,7 +1054,7 @@ export default function DocsPage() {
                 <div className="p-3 border rounded-lg">
                   <h4 className="font-semibold mb-1">Upload to Meta failed</h4>
                   <p className="text-sm text-muted-foreground">
-                    Ensure Meta GraphAPI token is valid and has permissions for Custom Audiences management.
+                    Ensure Apify API token is valid and has sufficient credits.
                   </p>
                 </div>
 

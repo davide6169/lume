@@ -592,24 +592,30 @@ export function SourceAudienceList() {
       // Start async job (works in both demo and production mode)
       const selectedAudiences = audiences.filter((a) => a.selected)
 
-      // Get API keys from settings store (for production mode)
-      const { apiKeys } = useSettingsStore.getState()
+      // Get API keys and settings from settings store (for production mode)
+      const { apiKeys, maxItemsFacebook, maxItemsInstagram } = useSettingsStore.getState()
 
       const requestBody: any = {
         sourceAudienceIds: selectedIds,
         mode: isDemoMode ? 'demo' : 'production'
       }
 
-      // In production mode, pass API keys securely
+      // In production mode, pass API keys securely and scraping limits
       if (!isDemoMode) {
         requestBody.apiKeys = {
+          apify: apiKeys.apify,
           apollo: apiKeys.apollo,
           hunter: apiKeys.hunter,
           openrouter: apiKeys.openrouter,
           mixedbread: apiKeys.mixedbread,
           meta: apiKeys.meta
         }
+        requestBody.scrapingLimits = {
+          facebook: maxItemsFacebook,
+          instagram: maxItemsInstagram
+        }
         console.log('[Frontend] Production mode - sending API keys for services:', Object.keys(requestBody.apiKeys).filter(k => requestBody.apiKeys[k]))
+        console.log('[Frontend] Production mode - scraping limits:', requestBody.scrapingLimits)
       }
 
       // In demo mode, pass the audience data directly (they're in the store, not DB)

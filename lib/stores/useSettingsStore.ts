@@ -3,6 +3,9 @@ import { persist } from 'zustand/middleware'
 import type { ExportableSettings } from '@/types'
 import { encryptApiKeys, decryptApiKeys, encryptSupabaseConfig, decryptSupabaseConfig } from '@/lib/utils/encryption'
 
+// Note: Encryption/decryption is handled by the storage middleware
+// The state always stores decrypted data for easy access
+
 interface SettingsState {
   // Demo mode
   demoMode: boolean
@@ -20,8 +23,19 @@ interface SettingsState {
   selectedEmbeddingModel: string
   setSelectedEmbeddingModel: (model: string) => void
 
-  // API Keys (encrypted, stored client-side)
+  // Scraping limits
+  maxItemsFacebook: number
+  setMaxItemsFacebook: (limit: number) => void
+  maxItemsInstagram: number
+  setMaxItemsInstagram: (limit: number) => void
+
+  // Log retention
+  logRetentionDays: number
+  setLogRetentionDays: (days: number) => void
+
+  // API Keys (encrypted in localStorage, decrypted in state)
   apiKeys: {
+    apify?: string
     meta?: string
     supabase?: string
     openrouter?: string
@@ -58,6 +72,9 @@ const defaultSettings = {
   logsEnabled: true, // Enabled by default in demo mode
   selectedLlmModel: 'mistral-7b-instruct:free',
   selectedEmbeddingModel: 'mxbai-embed-large-v1',
+  maxItemsFacebook: 100,
+  maxItemsInstagram: 100,
+  logRetentionDays: 3, // Keep logs for 3 days by default
   apiKeys: {},
   supabaseConfig: {
     url: '',
@@ -85,11 +102,16 @@ export const useSettingsStore = create<SettingsState>()(
 
       setSelectedEmbeddingModel: (model) => set({ selectedEmbeddingModel: model }),
 
+      setMaxItemsFacebook: (limit) => set({ maxItemsFacebook: limit }),
+
+      setMaxItemsInstagram: (limit) => set({ maxItemsInstagram: limit }),
+
+      setLogRetentionDays: (days) => set({ logRetentionDays: days }),
+
       setApiKey: (service, key) => {
-        // Encrypt the API key before storing
-        const encrypted = encryptApiKeys({ [service]: key })
+        // Store the API key as-is (will be encrypted by storage middleware)
         set((state) => ({
-          apiKeys: { ...state.apiKeys, ...encrypted },
+          apiKeys: { ...state.apiKeys, [service]: key },
         }))
       },
 
@@ -101,13 +123,12 @@ export const useSettingsStore = create<SettingsState>()(
         }),
 
       setSupabaseConfig: (url, anonKey) => {
-        // Encrypt Supabase config before storing
-        const encrypted = encryptSupabaseConfig({
-          url: url.trim(),
-          anonKey: anonKey.trim(),
-        })
+        // Store Supabase config as-is (will be encrypted by storage middleware)
         set(() => ({
-          supabaseConfig: encrypted,
+          supabaseConfig: {
+            url: url.trim(),
+            anonKey: anonKey.trim(),
+          },
         }))
       },
 
@@ -121,45 +142,43 @@ export const useSettingsStore = create<SettingsState>()(
 
       hasUserSupabaseConfig: () => {
         const { supabaseConfig } = get()
-        // Decrypt config before checking
-        const decrypted = decryptSupabaseConfig(supabaseConfig)
+        // Config is now always decrypted in state
         return (
-          decrypted.url !== '' &&
-          decrypted.anonKey !== '' &&
-          !decrypted.url.includes('your-project') &&
-          !decrypted.anonKey.includes('your-anon-key')
+          supabaseConfig.url !== '' &&
+          supabaseConfig.anonKey !== '' &&
+          !supabaseConfig.url.includes('your-project') &&
+          !supabaseConfig.anonKey.includes('your-anon-key')
         )
       },
 
       exportSettings: () => {
-        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig } = get()
-        // Decrypt sensitive data before export (WARNING: this still exposes keys!)
-        const decryptedApiKeys = decryptApiKeys(apiKeys)
-        const decryptedSupabaseConfig = decryptSupabaseConfig(supabaseConfig)
+        const { apiKeys, demoMode, logsEnabled, selectedLlmModel, selectedEmbeddingModel, supabaseConfig, maxItemsFacebook, maxItemsInstagram, logRetentionDays } = get()
+        // Data is now always decrypted in state (WARNING: this still exposes keys in export!)
         return {
-          apiKeys: decryptedApiKeys,
+          apiKeys,
           demoMode,
           logsEnabled,
           selectedLlmModel,
           selectedEmbeddingModel,
-          supabaseConfig: decryptedSupabaseConfig,
+          supabaseConfig,
+          maxItemsFacebook,
+          maxItemsInstagram,
+          logRetentionDays,
         }
       },
 
       importSettings: (settings) => {
-        // Encrypt sensitive data on import
-        const encryptedApiKeys = settings.apiKeys ? encryptApiKeys(settings.apiKeys) : {}
-        const encryptedSupabaseConfig = settings.supabaseConfig
-          ? encryptSupabaseConfig(settings.supabaseConfig)
-          : { url: '', anonKey: '' }
-
+        // Import data as-is (will be encrypted by storage middleware when saved)
         set({
-          apiKeys: encryptedApiKeys,
+          apiKeys: settings.apiKeys || {},
           demoMode: settings.demoMode ?? true,
           logsEnabled: settings.logsEnabled ?? (settings.demoMode ?? true), // Default based on demo mode
           selectedLlmModel: settings.selectedLlmModel || 'mistral-7b-instruct:free',
           selectedEmbeddingModel: settings.selectedEmbeddingModel || 'mxbai-embed-large-v1',
-          supabaseConfig: encryptedSupabaseConfig,
+          maxItemsFacebook: settings.maxItemsFacebook ?? 100,
+          maxItemsInstagram: settings.maxItemsInstagram ?? 100,
+          logRetentionDays: settings.logRetentionDays ?? 3,
+          supabaseConfig: settings.supabaseConfig || { url: '', anonKey: '' },
         })
       },
 
@@ -213,22 +232,49 @@ export const useSettingsStore = create<SettingsState>()(
         logsEnabled: state.logsEnabled,
         selectedLlmModel: state.selectedLlmModel,
         selectedEmbeddingModel: state.selectedEmbeddingModel,
-        apiKeys: state.apiKeys, // Already encrypted
-        supabaseConfig: state.supabaseConfig, // Already encrypted
+        maxItemsFacebook: state.maxItemsFacebook,
+        maxItemsInstagram: state.maxItemsInstagram,
+        apiKeys: state.apiKeys, // Will be transformed by storage
+        supabaseConfig: state.supabaseConfig, // Will be transformed by storage
       }),
-      // Decrypt state on hydration from localStorage
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Decrypt API keys on load (safeDecrypt handles both encrypted and plain text)
-          if (state.apiKeys && Object.keys(state.apiKeys).length > 0) {
-            state.apiKeys = decryptApiKeys(state.apiKeys)
+      // Transform state before saving to storage (encrypt sensitive data)
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name)
+          if (!str) return null
+          try {
+            const data = JSON.parse(str)
+            // Decrypt on load from storage
+            if (data.state?.apiKeys) {
+              data.state.apiKeys = decryptApiKeys(data.state.apiKeys)
+            }
+            if (data.state?.supabaseConfig) {
+              data.state.supabaseConfig = decryptSupabaseConfig(data.state.supabaseConfig)
+            }
+            return data
+          } catch {
+            return null
           }
-
-          // Decrypt Supabase config on load (safeDecrypt handles both encrypted and plain text)
-          if (state.supabaseConfig && (state.supabaseConfig.url || state.supabaseConfig.anonKey)) {
-            state.supabaseConfig = decryptSupabaseConfig(state.supabaseConfig)
+        },
+        setItem: (name, value) => {
+          try {
+            // value is already an object (StorageValue), not a string
+            const data = value
+            // Encrypt before saving to storage
+            if (data.state?.apiKeys) {
+              data.state.apiKeys = encryptApiKeys(data.state.apiKeys)
+            }
+            if (data.state?.supabaseConfig) {
+              data.state.supabaseConfig = encryptSupabaseConfig(data.state.supabaseConfig)
+            }
+            localStorage.setItem(name, JSON.stringify(data))
+          } catch (e) {
+            console.error('Error saving to storage:', e)
           }
-        }
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name)
+        },
       },
     }
   )

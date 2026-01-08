@@ -200,6 +200,7 @@ export interface DemoData {
 
 export interface ExportableSettings {
   apiKeys?: {
+    apify?: string;
     meta?: string;
     supabase?: string;
     openrouter?: string;
@@ -211,6 +212,9 @@ export interface ExportableSettings {
   logsEnabled?: boolean;
   selectedLlmModel?: string;
   selectedEmbeddingModel?: string;
+  maxItemsFacebook?: number;
+  maxItemsInstagram?: number;
+  logRetentionDays?: number;
   supabaseConfig?: {
     url: string;
     anonKey: string;

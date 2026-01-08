@@ -22,7 +22,7 @@ Questo documento descrive il processo completo per l'onboarding di nuovi clienti
 - ✅ Account GitHub (per repository dedicato)
 - ✅ Account Vercel (per hosting)
 - ✅ Account Supabase (per database)
-- ✅ Account Meta Developer (per APIs)
+- ✅ Account Apify (per scraping Facebook/Instagram)
 - ✅ API Keys per servizi esterni
 - ✅ Dominio proprio (opzionale, ma consigliato)
 
@@ -48,8 +48,9 @@ Questo documento descrive il processo completo per l'onboarding di nuovi clienti
 - [ ] Account GitHub attivo
 - [ ] Account Vercel attivo (gratuito)
 - [ ] Account Supabase attivo (gratuito o Pro)
-- [ ] Account Meta Developer attivo
+- [ ] Account Apify attivo (gratuito o paid)
 - [ ] API Keys ottenute:
+  - [ ] Apify API token
   - [ ] OpenRouter
   - [ ] Mixedbread AI
   - [ ] Apollo.io
@@ -167,6 +168,62 @@ ORDER BY table_name;
 
 ---
 
+## 🤖 Fase 2.5: Configurazione Apify
+
+### **Step 2.5.1: Creazione Account Apify**
+
+```
+ISTRUZIONI PER FORNITORE:
+
+1. Vai su https://apify.com
+2. Clicca "Sign Up" o "Login"
+3. Scegli piano:
+   - Free: $5 credit/month (~2,000 results)
+   - Paid: Starting from $49/month for higher limits
+4. Verifica email
+```
+
+### **Step 2.5.2: Ottenere API Token**
+
+```
+ISTRUZIONI PER FORNITORE:
+
+1. Vai su https://apify.com/account
+2. Sezione "API Tokens"
+3. Clicca "Create New Token"
+4. Nome: "lume-[cliente-nome]"
+5. Salva il token (copialo subito, non visibile dopo!)
+
+⚠️ IMPORTANTE: Non condividere mai il token via email o chat!
+```
+
+### **Step 2.5.3: Configurare su Vercel**
+
+```
+Vercel Dashboard → cliente-nome → Settings → Environment Variables
+
+Aggiungi:
+Name: APIFY_API_TOKEN
+Value: [il-tuo-token]
+Environment: Production, Preview, Development
+
+💡 COSTI APIFY (pay-per-result):
+- Instagram: $1.50 per 1,000 risultati
+- Facebook: ~$5 per 100 risultati
+```
+
+### **Step 2.5.4: Verifica Configurazione**
+
+```bash
+# Test API token (opzionale)
+curl -X GET "https://api.apify.com/v2/users/me" \
+  -H "Authorization: Bearer [APIFY_API_TOKEN]"
+
+# Dovresti vedere le info del tuo account
+```
+
+---
+
 ## 🌐 Fase 3: Configurazione Vercel
 
 ### **Step 3.1: Cliente Connette Repository**
@@ -212,18 +269,10 @@ Name: NEXT_PUBLIC_APP_URL
 Value: https://[dominio-cliente-o-vercel-domain]
 Environment: Production, Preview, Development
 
-=== META APIS ===
-Name: META_APP_ID
-Value: [Meta App ID del cliente]
+=== APIFY ===
+Name: APIFY_API_TOKEN
+Value: [Apify API Token del cliente]
 Environment: Production, Preview, Development
-
-Name: META_APP_SECRET
-Value: [Meta App Secret del cliente]
-Environment: Production ⚠️ SOLO Production
-
-Name: META_ACCESS_TOKEN
-Value: [Meta Access Token del cliente]
-Environment: Production ⚠️ SOLO Production
 
 === EXTERNAL APIS ===
 Name: OPENROUTER_API_KEY
@@ -445,7 +494,7 @@ Dovresti vedere:
 ### **Giorno 2: Formazione Avanzata (4 ore)**
 
 **Mattina (2 ore):**
-- Configurazione API Meta (30 min)
+- Configurazione API Apify (30 min)
 - Configurazione API esterne (30 min)
 - Gestione costi e budget (30 min)
 - Best practices e tips (30 min)
@@ -474,7 +523,7 @@ Dovresti vedere:
 - [ ] Repository GitHub: credenziali e link
 - [ ] Vercel Dashboard: accesso collaboratore
 - [ ] Supabase Dashboard: accesso proprietario
-- [ ] Meta Developer Account: configurato
+- [ ] Apify Account: configurato
 - [ ] API Keys: configurate (non condivise via email)
 
 ### **Test Effettuati**
@@ -588,17 +637,19 @@ Possibili cause:
    → Soluzione: Verifica NEXT_PUBLIC_SUPABASE_URL e ANON_KEY
 ```
 
-### **Meta API Non Funziona**
+### **Apify API Non Funziona**
 
 ```
-Sintomo: Errore connessione Meta
+Sintomo: Errore connessione Apify
 Possibili cause:
-1. API keys scadute
-   → Soluzione: Rigenera token su Meta Developer
-2. Permessi insufficienti
-   → Soluzione: Verifica permessi app Meta
-3. Webhook non configurato
-   → Soluzione: Configura webhook URL su Meta Developer
+1. API token scaduto o invalido
+   → Soluzione: Rigenera token su Apify → Account → API Tokens
+2. Crediti insufficienti
+   → Soluzione: Verifica saldo su Apify Dashboard
+3. Rate limit superato
+   → Soluzione: Apify gestisce automaticamente i rate limit, attendi qualche minuto
+4. Actor non disponibile
+   → Soluzione: Verifica che l'actor sia attivo su Apify Store
 ```
 
 ---

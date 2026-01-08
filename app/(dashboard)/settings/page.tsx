@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSettingsStore } from '@/lib/stores/useSettingsStore'
 import { useDemoStore } from '@/lib/stores/useDemoStore'
 import { Card } from '@/components/ui/card'
@@ -16,7 +16,7 @@ import { AlertCircle, Eye, EyeOff, Save, Download, Upload, FileText, Play, Check
 import { getTestScenarios } from '@/lib/services/api-test-definitions'
 
 const apiServices = [
-  { key: 'meta' as const, name: 'Meta (Facebook/Instagram)', description: 'For accessing social media data' },
+  { key: 'apify' as const, name: 'Apify', description: 'Web scraping for Facebook/Instagram (Recommended)' },
   { key: 'openrouter' as const, name: 'OpenRouter', description: 'LLM API for AI processing' },
   { key: 'mixedbread' as const, name: 'Mixedbread', description: 'Embeddings API for contact analysis' },
   { key: 'apollo' as const, name: 'Apollo.io', description: 'Contact data enrichment' },
@@ -32,6 +32,12 @@ export default function SettingsPage() {
     setSelectedLlmModel,
     selectedEmbeddingModel,
     setSelectedEmbeddingModel,
+    maxItemsFacebook,
+    setMaxItemsFacebook,
+    maxItemsInstagram,
+    setMaxItemsInstagram,
+    logRetentionDays,
+    setLogRetentionDays,
     apiKeys,
     setApiKey,
     removeApiKey,
@@ -59,6 +65,7 @@ export default function SettingsPage() {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [tempKeys, setTempKeys] = useState(apiKeys)
   const [saveMessage, setSaveMessage] = useState('')
+
   const [exportDialog, setExportDialog] = useState(false)
   const [exportFileName, setExportFileName] = useState(`lume-settings-${new Date().toISOString().split('T')[0]}.json`)
 
@@ -79,10 +86,15 @@ export default function SettingsPage() {
   const [testRunning, setTestRunning] = useState(false)
   const [testResult, setTestResult] = useState<any>(null)
 
+  // Database Test states
+  const [dbTestRunning, setDbTestRunning] = useState(false)
+  const [dbTestResult, setDbTestResult] = useState<any>(null)
+  const [dbTestDialogOpen, setDbTestDialogOpen] = useState(false)
+
   // API Keys save confirmation dialog
   const [saveConfirmDialog, setSaveConfirmDialog] = useState(false)
   const [savedKeysCount, setSavedKeysCount] = useState(0)
-  const [savingType, setSavingType] = useState<'api-keys' | 'database'>('api-keys')
+  const [savingType, setSavingType] = useState<'api-keys' | 'database' | 'preferences'>('api-keys')
 
   const handleSaveKeys = () => {
     let count = 0
@@ -132,9 +144,57 @@ export default function SettingsPage() {
     setSaveConfirmDialog(true)
   }
 
+  const handleTestDatabase = async () => {
+    // Validate inputs first
+    if (!tempSupabaseUrl.trim() || !tempSupabaseAnonKey.trim()) {
+      setSaveMessage('Error: Please fill in both Supabase URL and anon key before testing')
+      setTimeout(() => setSaveMessage(''), 5000)
+      return
+    }
+
+    // Open dialog to show test is running
+    setDbTestDialogOpen(true)
+    setDbTestRunning(true)
+    setDbTestResult(null)
+
+    try {
+      const response = await fetch('/api/settings/test-database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: tempSupabaseUrl.trim(),
+          anonKey: tempSupabaseAnonKey.trim()
+        }),
+      })
+
+      const result = await response.json()
+      setDbTestResult(result)
+
+      // Dialog stays open to show results
+    } catch (error: any) {
+      setDbTestResult({
+        success: false,
+        error: 'Test failed',
+        details: { message: error.message || 'Unknown error' }
+      })
+    } finally {
+      setDbTestRunning(false)
+    }
+  }
+
+  const handleSavePreferences = () => {
+    // Preferences are automatically saved by Zustand persist
+    // Just show confirmation dialog
+    setSavingType('preferences')
+    setSaveConfirmDialog(true)
+  }
+
   const confirmSave = () => {
     if (savingType === 'database') {
       handleSaveSupabase()
+    } else if (savingType === 'preferences') {
+      setSaveMessage('✅ Preferences have been saved successfully!')
+      setTimeout(() => setSaveMessage(''), 3000)
     } else {
       const count = savedKeysCount
       if (count > 0) {
@@ -332,6 +392,16 @@ export default function SettingsPage() {
                   >
                     {showKeys['supabase-anon'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleTestDatabase}
+                    disabled={dbTestRunning}
+                    title="Test database connection"
+                  >
+                    {dbTestRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Found in your Supabase dashboard: Settings → API
@@ -348,7 +418,7 @@ export default function SettingsPage() {
                   <li>Create a new project (takes about 2 minutes)</li>
                   <li>Go to Settings → API in your project dashboard</li>
                   <li>Copy the Project URL and anon/public key</li>
-                  <li>Paste them above and click "Save Database Configuration"</li>
+                  <li>Paste them above, click Test button (▶), then "Save Database Configuration"</li>
                 </ol>
               </div>
             </div>
@@ -359,6 +429,9 @@ export default function SettingsPage() {
                 <Save className="h-4 w-4 mr-2" />
                 Save Database Configuration
               </Button>
+              {saveMessage && savingType === 'database' && (
+                <p className="text-sm text-center text-muted-foreground mt-2">{saveMessage}</p>
+              )}
             </div>
           </Card>
         </TabsContent>
@@ -508,6 +581,88 @@ export default function SettingsPage() {
               </p>
             </div>
           </Card>
+
+          {/* Source Data Limits Settings */}
+          <Card className="p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold">Source Data Limits</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure maximum number of items to retrieve from Facebook and Instagram
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="max-items-facebook">Facebook Posts Limit</Label>
+                <Input
+                  id="max-items-facebook"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={maxItemsFacebook}
+                  onChange={(e) => setMaxItemsFacebook(Math.max(1, Math.min(10000, parseInt(e.target.value) || 100)))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum number of Facebook posts to retrieve (default: 100, max: 10,000)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="max-items-instagram">Instagram Comments Limit</Label>
+                <Input
+                  id="max-items-instagram"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={maxItemsInstagram}
+                  onChange={(e) => setMaxItemsInstagram(Math.max(1, Math.min(10000, parseInt(e.target.value) || 100)))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum number of Instagram comments to retrieve (default: 100, max: 10,000)
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Log Retention Settings */}
+          <Card className="p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold">Log Retention</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure how long to keep system logs before automatic cleanup
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="log-retention-days">Log Retention Days</Label>
+              <Input
+                id="log-retention-days"
+                type="number"
+                min="1"
+                max="30"
+                value={logRetentionDays}
+                onChange={(e) => setLogRetentionDays(Math.max(1, Math.min(30, parseInt(e.target.value) || 3)))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of days to keep logs before automatic deletion (default: 3, range: 1-30 days)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                <strong>Note:</strong> Logs older than the specified number of days will be automatically deleted to save database space.
+                Set to a higher value if you need longer audit trails, or lower value to minimize database storage.
+              </p>
+            </div>
+          </Card>
+
+          {/* Save Preferences Button */}
+          <Card className="p-6">
+            <Button onClick={handleSavePreferences} className="w-full">
+              <Save className="mr-2 h-4 w-4" />
+              Save Preferences
+            </Button>
+            {saveMessage && (
+              <p className="text-sm text-center mt-3 text-muted-foreground">{saveMessage}</p>
+            )}
+          </Card>
         </TabsContent>
 
         {/* Import/Export Tab */}
@@ -551,7 +706,7 @@ export default function SettingsPage() {
                   className="w-full"
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  Import Settings from File
+                  Import Settings
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">
                   Select a JSON file previously exported from Lume
@@ -580,7 +735,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <p><strong>This export contains sensitive credentials in plain text:</strong></p>
                 <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
-                  <li>API keys (Meta, OpenRouter, Mixedbread, Apollo, Hunter)</li>
+                  <li>API keys (Apify, OpenRouter, Mixedbread, Apollo, Hunter)</li>
                   <li>Supabase database URL and anon key</li>
                 </ul>
                 <p className="text-xs font-semibold mt-2">
@@ -727,17 +882,96 @@ export default function SettingsPage() {
         </Dialog>
       )}
 
+      {/* Database Test Dialog */}
+      <Dialog open={dbTestDialogOpen} onOpenChange={setDbTestDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-blue-600" />
+              Test Database Connection
+            </DialogTitle>
+            <DialogDescription>
+              Verify your Supabase database credentials are working correctly
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Test Status */}
+            {dbTestRunning && (
+              <div className="flex items-center gap-3 p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
+                <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                <div>
+                  <p className="font-medium">Testing connection...</p>
+                  <p className="text-xs text-muted-foreground">Please wait</p>
+                </div>
+              </div>
+            )}
+
+            {/* Test Result */}
+            {!dbTestRunning && dbTestResult && (
+              <div className={`p-4 rounded-lg border ${
+                dbTestResult.success
+                  ? 'bg-green-50 dark:bg-green-950 border-green-500'
+                  : 'bg-red-50 dark:bg-red-950 border-red-500'
+              }`}>
+                <div className="flex items-start gap-3">
+                  {dbTestResult.success ? (
+                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <p className="font-semibold mb-1">
+                      {dbTestResult.success ? 'Connection Successful' : 'Connection Failed'}
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {dbTestResult.success ? dbTestResult.message : dbTestResult.error}
+                    </p>
+                    {dbTestResult.details && (
+                      <div className="text-xs space-y-1">
+                        {dbTestResult.details.url && (
+                          <p className="text-muted-foreground">URL: {dbTestResult.details.url}</p>
+                        )}
+                        {dbTestResult.details.responseTime && (
+                          <p className="text-muted-foreground">Response time: {dbTestResult.details.responseTime}</p>
+                        )}
+                        {dbTestResult.details.status && (
+                          <p className="text-muted-foreground">Status: {dbTestResult.details.status}</p>
+                        )}
+                        {dbTestResult.details.message && !dbTestResult.success && (
+                          <p className="text-red-600 dark:text-red-400">{dbTestResult.details.message}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setDbTestDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Save Confirmation Dialog */}
       <Dialog open={saveConfirmDialog} onOpenChange={setSaveConfirmDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              {savingType === 'database' ? 'Save Database Configuration' : 'Save API Keys'}
+              {savingType === 'database' ? 'Save Database Configuration' :
+               savingType === 'preferences' ? 'Save Preferences' :
+               'Save API Keys'}
             </DialogTitle>
             <DialogDescription>
               {savingType === 'database'
                 ? 'Are you sure you want to save your Supabase database configuration? This will update your connection settings.'
+                : savingType === 'preferences'
+                ? 'Your preferences will be saved to your browser storage. This includes LLM models, embedding settings, and scraping limits.'
                 : (savedKeysCount === 1
                   ? '1 API key will be saved to your browser storage.'
                   : `${savedKeysCount} API keys will be saved to your browser storage.`

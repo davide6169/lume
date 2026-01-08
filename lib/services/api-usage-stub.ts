@@ -13,7 +13,7 @@ declare global {
     apollo_enrichments: number
     hunter_finder_calls: number
     hunter_verifier_calls: number
-    meta_calls: number
+    apify_results: number
   } | undefined
 }
 
@@ -73,14 +73,14 @@ interface HunterUsageResponse {
   }
 }
 
-interface MetaUsage {
-  rate_limit_remaining: number
-  rate_limit_used: number
+interface ApifyUsage {
+  results_fetched: number
+  estimated_cost_usd: number
 }
 
-interface MetaUsageResponse {
+interface ApifyUsageResponse {
   data: {
-    usage: MetaUsage
+    usage: ApifyUsage
   }
 }
 
@@ -108,7 +108,7 @@ export class APIUsageStubService {
           apollo_enrichments: 0,
           hunter_finder_calls: 0,
           hunter_verifier_calls: 0,
-          meta_calls: 0
+          apify_results: 0
         }
       }
       this.counters = globalThis.__apiUsageCounters
@@ -124,7 +124,7 @@ export class APIUsageStubService {
         apollo_enrichments: 0,
         hunter_finder_calls: 0,
         hunter_verifier_calls: 0,
-        meta_calls: 0
+        apify_results: 0
       }
     }
   }
@@ -206,16 +206,22 @@ export class APIUsageStubService {
   }
 
   /**
-   * Get Meta GraphAPI usage (stub)
+   * Get Apify API usage (stub)
    */
-  async getMetaUsage(): Promise<MetaUsageResponse> {
+  async getApifyUsage(): Promise<ApifyUsageResponse> {
     await this.delay(100)
+
+    // Calculate estimated cost based on results fetched
+    // Instagram: $1.50 per 1,000 results = $0.0015 per result
+    // Facebook: ~$5 per 100 results = $0.05 per result
+    // Using average for estimation
+    const estimatedCost = (this.counters.apify_results / 1000) * 1.5
 
     return {
       data: {
         usage: {
-          rate_limit_remaining: 200 - this.counters.meta_calls,
-          rate_limit_used: this.counters.meta_calls
+          results_fetched: this.counters.apify_results,
+          estimated_cost_usd: Number(estimatedCost.toFixed(4))
         }
       }
     }
@@ -268,11 +274,11 @@ export class APIUsageStubService {
   }
 
   /**
-   * Simulate Meta GraphAPI call
+   * Simulate Apify scraping call
    */
-  simulateMetaCall(count: number): void {
-    this.counters.meta_calls += count
-    console.log(`[APIUsageStubService] Simulated Meta GraphAPI call: ${count} calls`)
+  simulateApifyCall(resultsCount: number): void {
+    this.counters.apify_results += resultsCount
+    console.log(`[APIUsageStubService] Simulated Apify scraping: ${resultsCount} results`)
   }
 
   /**
@@ -287,7 +293,7 @@ export class APIUsageStubService {
     this.counters.apollo_enrichments = 0
     this.counters.hunter_finder_calls = 0
     this.counters.hunter_verifier_calls = 0
-    this.counters.meta_calls = 0
+    this.counters.apify_results = 0
   }
 }
 
@@ -320,8 +326,10 @@ export const API_PRICING = {
     email_finder: 0.02, // 2 credits per search
     email_verifier: 0.001, // 1 credit per verification
   },
-  meta: {
-    free_tier: true, // Meta GraphAPI is free
-    per_call: 0
+  apify: {
+    instagram: 1.50, // per 1,000 results
+    facebook: 5.00, // per ~100 results
+    per_result_instagram: 1.50 / 1000,
+    per_result_facebook: 5.00 / 100
   }
 }

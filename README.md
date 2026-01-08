@@ -16,11 +16,12 @@
 
 ## 📖 Descrizione
 
-**Lume** è una piattaforma web moderna per la gestione dei lead (potenziali clienti) che utilizza l'Intelligenza Artificiale per estrarre e arricchire contatti da Facebook e Instagram.
+**Lume** è una piattaforma web moderna per la gestione dei lead (potenziali clienti) che utilizza l'Intelligenza Artificiale per estrarre e arricchire contatti da Facebook e Instagram tramite web scraping Apify.
 
 ### ✨ Funzionalità Principali
 
 - 🎯 **Source Audiences**: Gestione gruppi di URL Facebook/Instagram
+- 🤖 **Apify Integration**: Web scraping per FB/IG con pay-per-result
 - 🔍 **AI-Powered Search**: Estrazione contatti usando LLM + Embeddings
 - ✉ **Data Enrichment**: Integrazione Apollo.io e Hunter.io
 - 📊 **Dashboard**: Statistiche real-time con cost tracking
@@ -36,6 +37,7 @@
 
 - **Frontend**: Next.js 16, TypeScript, TailwindCSS, shadcn/ui
 - **Backend**: Supabase (PostgreSQL + pgvector)
+- **Web Scraping**: Apify (Instagram/Facebook)
 - **AI**: OpenRouter (LLM), Mixedbread (Embeddings)
 - **Enrichment**: Apollo.io, Hunter.io
 - **Deployment**: Vercel + GitHub
