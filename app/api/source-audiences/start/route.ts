@@ -747,6 +747,13 @@ async function processSearchJob(jobId: string, userId: string) {
 
         console.log('[JobProcessor] Using scraping limits:', scrapingLimits)
 
+        // Array to hold contacts extracted from comments
+        let extractedContacts: any[] = []
+
+        // Track metrics for cost calculation
+        let totalCommentsFetched = 0
+        let totalEnrichmentsPerformed = 0
+
         // Initialize Apify production service if API key available
         if (apiKeys?.apify) {
           const apifyService = new ApifyScraperService(apiKeys.apify)
@@ -796,53 +803,220 @@ async function processSearchJob(jobId: string, userId: string) {
             throw error
           }
 
-          // Demonstrate Facebook post fetching with Apify
-          const sampleFacebookUrl = 'https://www.facebook.com/20531316728/posts/10158264921766728/'
+          // Process each Source Audience - fetch comments from real URLs
+          let allFetchedComments: any[] = []
 
-          update(20, {
-            timestamp: new Date().toISOString(),
-            event: 'APIFY_FETCH_STARTED',
-            details: {
-              provider: 'Apify',
-              platform: 'Facebook',
-              url: sampleFacebookUrl
-            }
-          })
+          for (let i = 0; i < sourceAudiences.length; i++) {
+            const audience: any = sourceAudiences[i]
+            const audienceProgress = 10 + ((i / sourceAudiences.length) * 40)
 
-          try {
-            const parsedUrl = apifyService.parseUrl(sampleFacebookUrl)
-            console.log('[JobProcessor] Parsed Facebook URL:', parsedUrl)
+            console.log(`[JobProcessor] Processing audience: ${audience.name} (${audience.type})`)
 
-            // Fetch comments from the post using Apify
-            const comments = await apifyService.fetchFacebookComments(parsedUrl.id, { limit: scrapingLimits.facebook })
-
-            console.log('[JobProcessor] Fetched Facebook comments:', comments.length)
-
-            update(25, {
+            update(audienceProgress, {
               timestamp: new Date().toISOString(),
-              event: 'APIFY_FETCH_COMPLETED',
+              event: 'AUDIENCE_PROCESSING_STARTED',
               details: {
-                provider: 'Apify',
-                platform: 'Facebook',
-                resourceType: 'post comments',
-                commentsFetched: comments.length,
-                sampleComments: comments.slice(0, 3).map(c => ({
-                  from: c.from.name,
-                  message: c.message.substring(0, 100) + '...'
-                }))
+                audienceName: audience.name,
+                audienceId: audience.id,
+                urlCount: audience.urls.length,
+                platform: audience.type
               }
             })
-          } catch (error) {
-            console.error('[JobProcessor] Exception during Apify fetch:', error)
-            update(25, {
+
+            // Process each URL in the audience
+            for (let j = 0; j < audience.urls.length; j++) {
+              const url = audience.urls[j]
+              const urlProgress = audienceProgress + ((j / audience.urls.length) * 5)
+
+              console.log(`[JobProcessor] Processing URL ${j + 1}/${audience.urls.length}: "${url}" (type: ${typeof url})`)
+
+              try {
+                // Parse URL to determine platform and type
+                const parsedUrl = apifyService.parseUrl(url)
+                console.log('[JobProcessor] Parsed URL:', { url, parsed: parsedUrl })
+
+                update(urlProgress, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APIFY_FETCH_STARTED',
+                  details: {
+                    provider: 'Apify',
+                    platform: parsedUrl.platform,
+                    url: url,
+                    urlIndex: j + 1
+                  }
+                })
+
+                // Fetch comments based on platform
+                let comments: any[] = []
+                if (parsedUrl.platform === 'facebook') {
+                  comments = await apifyService.fetchFacebookComments(url, {
+                    limit: scrapingLimits.facebook
+                  })
+                } else if (parsedUrl.platform === 'instagram') {
+                  comments = await apifyService.fetchInstagramComments(url, {
+                    limit: scrapingLimits.instagram
+                  })
+                }
+
+                console.log(`[JobProcessor] Fetched ${comments.length} comments from ${url}`)
+                allFetchedComments.push(...comments)
+
+                update(urlProgress + 2, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APIFY_FETCH_COMPLETED',
+                  details: {
+                    provider: 'Apify',
+                    platform: parsedUrl.platform,
+                    url: url,
+                    commentsFetched: comments.length,
+                    totalComments: allFetchedComments.length
+                  }
+                })
+              } catch (error) {
+                console.error(`[JobProcessor] Failed to fetch from ${url}:`, error)
+                update(urlProgress, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APIFY_FETCH_FAILED',
+                  details: {
+                    provider: 'Apify',
+                    url: url,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                  }
+                })
+              }
+            }
+
+            update(audienceProgress + 5, {
               timestamp: new Date().toISOString(),
-              event: 'APIFY_FETCH_FAILED',
+              event: 'AUDIENCE_PROCESSING_COMPLETED',
               details: {
-                provider: 'Apify',
-                error: error instanceof Error ? error.message : 'Unknown error'
+                audienceName: audience.name,
+                totalCommentsFetched: allFetchedComments.length
               }
             })
           }
+
+          console.log(`[JobProcessor] Total comments fetched: ${allFetchedComments.length}`)
+
+          // Track for cost calculation
+          totalCommentsFetched = allFetchedComments.length
+
+          // Validate that we successfully fetched comments
+          if (allFetchedComments.length === 0) {
+            console.error('[JobProcessor] No comments fetched from any URL in production mode')
+            throw new Error('No comments were fetched from the Source Audience URLs. Please verify:\n' +
+              '1. The URLs are correct and publicly accessible\n' +
+              '2. The posts have comments (not all posts do)\n' +
+              '3. The accounts are public (not private)\n' +
+              'Try with a more active account like https://www.instagram.com/garyvee')
+          }
+
+          // ============================================
+          // STEP 2: LLM Extraction - Extract contacts from comments
+          // ============================================
+
+          update(55, {
+            timestamp: new Date().toISOString(),
+            event: 'LLM_EXTRACTION_STARTED',
+            details: {
+              provider: 'OpenRouter',
+              task: 'Extract contacts from comments',
+              totalComments: allFetchedComments.length
+            }
+          })
+
+          console.log('[JobProcessor] Starting LLM extraction from comments')
+
+          // Check if OpenRouter API key is available
+          if (!apiKeys || !apiKeys.openrouter) {
+            console.error('[JobProcessor] Missing OpenRouter API key for LLM extraction')
+            throw new Error('OpenRouter API key is required for production mode. Please configure it in Settings.')
+          }
+
+          const openRouterService = createOpenRouterService(apiKeys.openrouter)
+          console.log('[JobProcessor] OpenRouter service initialized')
+
+          // Process comments in batches to avoid overwhelming the LLM
+          const batchSize = 50
+          const totalBatches = Math.ceil(allFetchedComments.length / batchSize)
+          let totalContactsExtracted = 0
+
+          for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+            const startIdx = batchIndex * batchSize
+            const endIdx = Math.min(startIdx + batchSize, allFetchedComments.length)
+            const batch = allFetchedComments.slice(startIdx, endIdx)
+
+            console.log(`[JobProcessor] Processing batch ${batchIndex + 1}/${totalBatches} (${batch.length} comments)`)
+
+            // Combine comment texts for extraction
+            const commentsText = batch
+              .map((comment: any, idx: number) => {
+                const commentText = comment.text || comment.message || ''
+                const username = comment.from?.username || comment.from?.name || 'Unknown'
+                return `Comment ${startIdx + idx + 1} by ${username}: ${commentText}`
+              })
+              .join('\n\n')
+
+            try {
+              // Extract contacts using OpenRouter LLM
+              const batchExtracted = await openRouterService.extractContacts(
+                commentsText,
+                'mistralai/mistral-7b-instruct:free'
+              )
+
+              console.log(`[JobProcessor] Extracted ${batchExtracted.length} contacts from batch ${batchIndex + 1}`)
+
+              // Add to extracted contacts
+              if (Array.isArray(batchExtracted)) {
+                extractedContacts.push(...batchExtracted)
+                totalContactsExtracted += batchExtracted.length
+              }
+
+              // Update progress
+              const extractionProgress = 55 + ((batchIndex + 1) / totalBatches) * 10
+              update(extractionProgress, {
+                timestamp: new Date().toISOString(),
+                event: 'LLM_EXTRACTION_PROGRESS',
+                details: {
+                  provider: 'OpenRouter',
+                  batchNumber: batchIndex + 1,
+                  totalBatches: totalBatches,
+                  contactsExtracted: totalContactsExtracted,
+                  commentsProcessed: endIdx
+                }
+              })
+            } catch (error) {
+              console.error(`[JobProcessor] LLM extraction failed for batch ${batchIndex + 1}:`, error)
+              // Continue with next batch even if this one fails
+            }
+          }
+
+          console.log(`[JobProcessor] LLM extraction completed. Total contacts extracted: ${extractedContacts.length}`)
+
+          update(65, {
+            timestamp: new Date().toISOString(),
+            event: 'LLM_EXTRACTION_COMPLETED',
+            details: {
+              provider: 'OpenRouter',
+              model: 'mistralai/mistral-7b-instruct:free',
+              totalComments: allFetchedComments.length,
+              totalContactsExtracted: extractedContacts.length,
+              sampleContacts: extractedContacts.slice(0, 3).map((c: any) => ({
+                firstName: c.firstName,
+                lastName: c.lastName,
+                email: c.email
+              }))
+            }
+          })
+
+          // Validate that we extracted at least some contacts
+          if (extractedContacts.length === 0) {
+            console.warn('[JobProcessor] No contacts extracted from comments. This may be normal if comments don\'t contain contact information.')
+          }
+
+          // ============================================
+          // End of LLM Extraction
+          // ============================================
         } else {
           console.log('[JobProcessor] No Apify API key provided, skipping Apify integration')
           throw new Error('Apify API key is required for production mode. Please configure it in Settings.')
@@ -864,105 +1038,269 @@ async function processSearchJob(jobId: string, userId: string) {
         let successfulEnrichments = 0
         let failedEnrichments = 0
 
-        // Process each audience
-        for (let i = 0; i < sourceAudiences.length; i++) {
-          const audience: any = sourceAudiences[i]
-          const audienceProgress = 10 + ((i + 1) / totalAudiences) * 80
+        // ============================================
+        // STEP 3: Apollo Enrichment - Enrich extracted contacts
+        // ============================================
 
-          update(audienceProgress - 5, {
+        console.log(`[JobProcessor] Starting Apollo enrichment for ${extractedContacts.length} extracted contacts`)
+
+        update(70, {
+          timestamp: new Date().toISOString(),
+          event: 'APOLLO_ENRICHMENT_STARTED',
+          details: {
+            provider: 'Apollo.io',
+            task: 'Enrich extracted contacts',
+            totalContacts: extractedContacts.length
+          }
+        })
+
+        // Enrich all extracted contacts using Apollo
+        for (let j = 0; j < extractedContacts.length; j++) {
+          const contact = extractedContacts[j]
+          const contactProgress = 70 + (j / extractedContacts.length) * 25
+
+          update(contactProgress, {
             timestamp: new Date().toISOString(),
-            event: 'AUDIENCE_PROCESSING_STARTED',
+            event: 'APOLLO_ENRICHMENT_STARTED',
             details: {
-              audienceName: audience.name,
-              audienceId: audience.id,
-              urlCount: audience.urls.length,
-              platform: audience.type
+              provider: 'Apollo.io',
+              endpoint: '/api/v1/people/match',
+              contactEmail: contact.email || 'N/A',
+              contactIndex: j + 1
             }
           })
 
-          // Simulate some contacts to enrich (in real implementation, these would come from Meta GraphAPI + LLM extraction)
-          const sampleContacts = [
-            { firstName: 'Mario', lastName: 'Rossi', email: 'mario.rossi@example.com' },
-            { firstName: 'Lucia', lastName: 'Bianchi', email: 'lucia.bianchi@techcompany.it' },
-            { firstName: 'Marco', lastName: 'Verdi', email: 'marco.verdi@startup.com' }
-          ]
+          try {
+            // Call real Apollo API
+            const enrichmentRequest = apolloService.contactToEnrichmentRequest(contact)
+            const result = await apolloService.enrichPerson(enrichmentRequest)
 
-          console.log(`[JobProcessor] Enriching ${sampleContacts.length} contacts for audience ${audience.name}`)
-
-          // Enrich contacts using Apollo production API
-          for (let j = 0; j < sampleContacts.length; j++) {
-            const contact = sampleContacts[j]
-            const contactProgress = audienceProgress - 4 + (j / sampleContacts.length) * 4
-
-            update(contactProgress, {
-              timestamp: new Date().toISOString(),
-              event: 'APOLLO_ENRICHMENT_STARTED',
-              details: {
-                provider: 'Apollo.io',
-                endpoint: '/api/v1/people/match',
-                contactEmail: contact.email,
-                contactIndex: j + 1
-              }
-            })
-
-            try {
-              // Call real Apollo API
-              const enrichmentRequest = apolloService.contactToEnrichmentRequest(contact)
-              const result = await apolloService.enrichPerson(enrichmentRequest)
-
-              if (result.error) {
-                console.error(`[JobProcessor] Apollo enrichment failed for ${contact.email}:`, result.error)
-                failedEnrichments++
-                update(contactProgress, {
-                  timestamp: new Date().toISOString(),
-                  event: 'APOLLO_ENRICHMENT_FAILED',
-                  details: {
-                    provider: 'Apollo.io',
-                    contactEmail: contact.email,
-                    error: result.error
-                  }
-                })
-              } else if (result.person) {
-                console.log(`[JobProcessor] Apollo enrichment successful for ${contact.email}`)
-                successfulEnrichments++
-                totalContactsEnriched++
-
-                update(contactProgress, {
-                  timestamp: new Date().toISOString(),
-                  event: 'APOLLO_ENRICHMENT_COMPLETED',
-                  details: {
-                    provider: 'Apollo.io',
-                    endpoint: '/api/v1/people/match',
-                    contactEmail: contact.email,
-                    enrichedData: {
-                      firstName: result.person.first_name,
-                      lastName: result.person.last_name,
-                      title: result.person.title,
-                      company: result.person.employment_history?.[0]?.organization_name,
-                      linkedinUrl: result.person.linkedin_url,
-                      phoneFound: !!result.person.contact?.phone_numbers?.length
-                    }
-                  }
-                })
-              }
-            } catch (error) {
-              console.error(`[JobProcessor] Exception during Apollo enrichment for ${contact.email}:`, error)
+            if (result.error) {
+              console.error(`[JobProcessor] Apollo enrichment failed for contact ${j + 1}:`, result.error)
               failedEnrichments++
+              update(contactProgress, {
+                timestamp: new Date().toISOString(),
+                event: 'APOLLO_ENRICHMENT_FAILED',
+                details: {
+                  provider: 'Apollo.io',
+                  contactIndex: j + 1,
+                  error: result.error
+                }
+              })
+            } else if (result.person) {
+              console.log(`[JobProcessor] Apollo enrichment successful for contact ${j + 1}`)
+              successfulEnrichments++
+              totalContactsEnriched++
+
+              // Merge enriched data back into contact
+              Object.assign(contact, {
+                title: result.person.title,
+                company: result.person.employment_history?.[0]?.organization_name,
+                linkedin_url: result.person.linkedin_url,
+                phone: result.person.contact?.phone_numbers?.[0]?.raw_number || null,
+                enriched: true
+              })
+
+              update(contactProgress, {
+                timestamp: new Date().toISOString(),
+                event: 'APOLLO_ENRICHMENT_COMPLETED',
+                details: {
+                  provider: 'Apollo.io',
+                  endpoint: '/api/v1/people/match',
+                  contactIndex: j + 1,
+                  enrichedData: {
+                    firstName: result.person.first_name,
+                    lastName: result.person.last_name,
+                    title: result.person.title,
+                    company: result.person.employment_history?.[0]?.organization_name,
+                    linkedinUrl: result.person.linkedin_url,
+                    phoneFound: !!result.person.contact?.phone_numbers?.length
+                  }
+                }
+              })
+            }
+          } catch (error) {
+            console.error(`[JobProcessor] Exception during Apollo enrichment for contact ${j + 1}:`, error)
+            failedEnrichments++
+          }
+        }
+
+        console.log(`[JobProcessor] Apollo enrichment completed. Total enriched: ${totalContactsEnriched}`)
+
+        // Track for cost calculation
+        totalEnrichmentsPerformed = totalContactsEnriched
+
+        // ============================================
+        // End of Apollo Enrichment
+        // ============================================
+
+        // ============================================
+        // STEP 4: Database Save - Save enriched contacts
+        // ============================================
+
+        console.log(`[JobProcessor] Starting database save for ${extractedContacts.length} contacts`)
+
+        update(95, {
+          timestamp: new Date().toISOString(),
+          event: 'DATABASE_SAVE_STARTED',
+          details: {
+            task: 'Save extracted and enriched contacts to database',
+            totalContacts: extractedContacts.length
+          }
+        })
+
+        try {
+          // Generate a name for the shared audience based on source audiences
+          const sharedAudienceName = sourceAudiences
+            .map((audience: any) => audience.name)
+            .join(' + ') + ' - Extracted'
+
+          console.log('[JobProcessor] Creating shared audience:', sharedAudienceName)
+
+          // Create shared audience with enriched contacts
+          const { data: sharedAudience, error: insertError } = await supabase
+            .from('shared_audiences')
+            .insert({
+              user_id: userId,
+              source_audience_id: sourceAudiences[0].id, // Link to first source audience
+              name: sharedAudienceName,
+              contacts: extractedContacts,
+              selected: false,
+              uploaded_to_meta: false
+            })
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error('[JobProcessor] Failed to create shared audience:', insertError)
+            throw new Error(`Failed to save contacts to database: ${insertError.message}`)
+          }
+
+          console.log('[JobProcessor] Shared audience created successfully:', sharedAudience.id)
+
+          // Update source audience status to completed
+          const sourceAudienceIds = sourceAudiences.map((audience: any) => audience.id)
+          const { error: updateError } = await supabase
+            .from('source_audiences')
+            .update({
+              status: 'completed',
+              updated_at: new Date().toISOString()
+            })
+            .in('id', sourceAudienceIds)
+
+          if (updateError) {
+            console.error('[JobProcessor] Failed to update source audience status:', updateError)
+            // Don't throw here, as the main save succeeded
+          } else {
+            console.log('[JobProcessor] Source audiences updated to completed status')
+          }
+
+          update(98, {
+            timestamp: new Date().toISOString(),
+            event: 'DATABASE_SAVE_COMPLETED',
+            details: {
+              sharedAudienceId: sharedAudience.id,
+              sharedAudienceName: sharedAudience.name,
+              contactsSaved: extractedContacts.length,
+              sourceAudiencesUpdated: sourceAudienceIds.length
+            }
+          })
+
+          console.log(`[JobProcessor] Database save completed successfully`)
+        } catch (error) {
+          console.error('[JobProcessor] Exception during database save:', error)
+          update(98, {
+            timestamp: new Date().toISOString(),
+            event: 'DATABASE_SAVE_FAILED',
+            details: {
+              error: error instanceof Error ? error.message : 'Unknown error'
+            }
+          })
+          // Don't throw - allow the job to complete even if save fails
+        }
+
+        // ============================================
+        // End of Database Save
+        // ============================================
+
+        // ============================================
+        // STEP 5: Cost Tracking - Save API costs
+        // ============================================
+
+        console.log('[JobProcessor] Starting cost tracking')
+
+        try {
+          const costsToInsert = []
+
+          // Calculate Apify cost based on comments fetched
+          if (totalCommentsFetched > 0) {
+            // Average cost: Instagram $1.50/1000, Facebook $5/100
+            // Using average of $0.01 per comment for estimation
+            const apifyCost = totalCommentsFetched * 0.01
+            costsToInsert.push({
+              user_id: userId,
+              service: 'apify',
+              operation: 'scraping_comments',
+              cost: apifyCost
+            })
+            console.log(`[JobProcessor] Apify cost: $${apifyCost.toFixed(4)} (${totalCommentsFetched} comments)`)
+          }
+
+          // Calculate OpenRouter cost based on comments processed
+          if (totalCommentsFetched > 0) {
+            // Estimate: ~100 tokens per comment, free model = $0.0015/1M tokens
+            // For 50 comments in batch: ~5000 tokens = ~$0.000008
+            const estimatedTokens = totalCommentsFetched * 100
+            const openrouterCost = estimatedTokens * API_PRICING.openrouter.per_token
+            if (openrouterCost > 0.0001) { // Only track if cost > $0.0001
+              costsToInsert.push({
+                user_id: userId,
+                service: 'openrouter',
+                operation: 'llm_extraction',
+                cost: openrouterCost
+              })
+              console.log(`[JobProcessor] OpenRouter cost: $${openrouterCost.toFixed(4)} (${estimatedTokens} tokens est.)`)
             }
           }
 
-          // Complete audience processing
-          update(audienceProgress, {
-            timestamp: new Date().toISOString(),
-            event: 'AUDIENCE_PROCESSING_COMPLETED',
-            details: {
-              audienceName: audience.name,
-              contactsProcessed: sampleContacts.length,
-              successfulEnrichments,
-              failedEnrichments
+          // Calculate Apollo cost based on enrichments performed
+          if (totalEnrichmentsPerformed > 0) {
+            const apolloCost = totalEnrichmentsPerformed * API_PRICING.apollo.per_enrichment
+            costsToInsert.push({
+              user_id: userId,
+              service: 'apollo',
+              operation: 'contact_enrichment',
+              cost: apolloCost
+            })
+            console.log(`[JobProcessor] Apollo cost: $${apolloCost.toFixed(4)} (${totalEnrichmentsPerformed} enrichments)`)
+          }
+
+          // Insert all costs
+          if (costsToInsert.length > 0) {
+            const { error: costError } = await supabase
+              .from('cost_tracking')
+              .insert(costsToInsert)
+
+            if (costError) {
+              console.error('[JobProcessor] Failed to save costs:', costError)
+            } else {
+              console.log(`[JobProcessor] Saved ${costsToInsert.length} cost records`)
+
+              // Calculate total cost
+              const totalCost = costsToInsert.reduce((sum, c) => sum + c.cost, 0)
+              console.log(`[JobProcessor] Total API cost: $${totalCost.toFixed(4)}`)
             }
-          })
+          } else {
+            console.log('[JobProcessor] No costs to track')
+          }
+        } catch (error) {
+          console.error('[JobProcessor] Exception during cost tracking:', error)
+          // Don't throw - cost tracking is not critical
         }
+
+        // ============================================
+        // End of Cost Tracking
+        // ============================================
 
         // Final completion
         update(100, {
