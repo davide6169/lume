@@ -8,7 +8,7 @@
  * The JWT secret is also committed because it's only used for demo mode.
  */
 
-import { SignJWT, jwtVerify } from 'jose'
+import { JWTPayload, SignJWT, jwtVerify } from 'jose'
 
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL || 'demo@lume.app'
 const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD || 'Lume#Secure$2026!Pr0d@Acc3ss'
@@ -22,6 +22,10 @@ export interface DemoUser {
   role: 'admin' | 'user'
   status: 'pending' | 'approved'
   isDemo: true
+}
+
+interface DemoJWTPayload extends JWTPayload {
+  user: DemoUser
 }
 
 /**
@@ -57,10 +61,10 @@ export async function generateDemoToken(): Promise<string> {
  */
 export async function verifyDemoToken(token: string): Promise<DemoUser | null> {
   try {
-    const { payload } = await jwtVerify(token, DEMO_JWT_SECRET)
+    const { payload } = await jwtVerify<DemoJWTPayload>(token, DEMO_JWT_SECRET)
 
     if (payload.user && payload.user.isDemo) {
-      return payload.user as DemoUser
+      return payload.user
     }
 
     return null
