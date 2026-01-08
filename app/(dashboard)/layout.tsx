@@ -75,6 +75,11 @@ const navItems = [
     adminOnly: true,
   },
   {
+    name: 'Settings',
+    href: '/settings',
+    icon: Settings,
+  },
+  {
     name: 'Docs',
     href: '/docs',
     icon: BookOpen,

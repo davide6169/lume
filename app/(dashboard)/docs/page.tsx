@@ -503,7 +503,7 @@ export default function DocsPage() {
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
                     <li>• <strong>Export:</strong> Download all settings as JSON file (includes API keys, database config, preferences)</li>
                     <li>• <strong>Import:</strong> Upload JSON file to restore settings</li>
-                    <li>• <strong>Complete Backup:</strong> Includes LLM/embedding models, scraping limits, all API keys, Supabase config</li>
+                    <li>• <strong>Complete Backup:</strong> Includes LLM/embedding models, source data limits, all API keys, Supabase config</li>
                     <li>• <strong>Team Sharing:</strong> Admins can export config for new team members</li>
                     <li>• <strong>Security Warning:</strong> Export shows prominent warning about sensitive credentials</li>
                   </ul>
@@ -515,7 +515,7 @@ export default function DocsPage() {
                 <div className="border-t pt-3">
                   <h4 className="font-semibold mb-1">Preferences</h4>
                   <p className="text-sm text-muted-foreground">
-                    Configure AI models, scraping limits, and log retention:
+                    Configure AI models, source data limits, and log retention:
                   </p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
                     <li>• <strong>LLM Model:</strong> Select OpenRouter model for contact extraction (default: mistral-7b-instruct:free)</li>

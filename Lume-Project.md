@@ -28,8 +28,8 @@ A complete multi-tenant SaaS platform for extracting, enriching, and managing co
 - Build custom audiences for Meta advertising campaigns
 - Track and manage all associated costs automatically
 
-**Current Version:** v1.3
-**Last Updated:** January 2025
+**Current Version:** v1.3.1
+**Last Updated:** January 2026
 **License:** Proprietary
 
 ---
@@ -591,7 +591,7 @@ Create and manage source audiences from social media URLs:
 - API keys (encrypted)
 - LLM model selection
 - Embedding model selection
-- Scraping limits
+- Source data limits (Facebook & Instagram retrieval limits)
 - Log retention days
 - Database configuration
 - Demo mode toggle

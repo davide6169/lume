@@ -582,10 +582,10 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          {/* Scraping Limits Settings */}
+          {/* Source Data Limits Settings */}
           <Card className="p-6 space-y-6">
             <div>
-              <h2 className="text-xl font-semibold">Scraping Limits</h2>
+              <h2 className="text-xl font-semibold">Source Data Limits</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Configure maximum number of items to retrieve from Facebook and Instagram
               </p>

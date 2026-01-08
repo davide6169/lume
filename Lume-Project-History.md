@@ -1875,6 +1875,22 @@ Proprietary - All rights reserved
 
 ## Changelog
 
+### Version 1.1.3 (January 2026) - UI/UX Improvements 🎨
+- **Navigation Enhancement**: Added "Settings" to main navigation menu (before "Docs")
+- **Terminology Update**: Renamed "Scraping Limits" to "Source Data Limits" to avoid controversial terms
+  - More professional language avoiding "scraping" which may imply unauthorized data collection
+  - Better reflects the legitimate data retrieval process from public social media sources
+- **Improved Accessibility**: Settings now more discoverable in main navigation
+- **Consistent UX**: Navigation menu includes all main application sections
+
+**Updated Files**:
+- `app/(dashboard)/layout.tsx`: Added Settings to navItems array
+- `app/(dashboard)/settings/page.tsx`: Changed "Scraping Limits" to "Source Data Limits"
+
+**Documentation Updates**:
+- All documentation files updated to reflect terminology changes
+- In-app Docs page updated with new navigation structure
+
 ### Version 1.1.2 (January 2026) - Performance & Reliability Release ⚡
 - **Race Condition Prevention**: Job IDs now use crypto.randomUUID() instead of Date.now() + random
 - **Atomic Processing Locks**: Jobs added to processing set BEFORE status update (no concurrent execution)
