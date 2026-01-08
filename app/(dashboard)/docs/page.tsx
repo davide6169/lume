@@ -777,20 +777,32 @@ export default function DocsPage() {
                       </div>
                       <div className="flex items-start gap-2">
                         <span className="text-blue-600 font-bold">STEP 3:</span>
-                        <span><strong>Apollo Enrichment</strong> (70-95%) - Add professional data (title, company, LinkedIn)</span>
+                        <span><strong>Apollo Enrichment</strong> (70-85%) - Add professional data (title, company, LinkedIn)</span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <span className="text-blue-600 font-bold">STEP 4:</span>
-                        <span><strong>Database Save</strong> (95-98%) - Persist enriched contacts to Supabase</span>
+                        <span className="text-blue-600 font-bold">STEP 6:</span>
+                        <span><strong>Hunter Email Finder</strong> (85-87.5%) - Find missing email addresses</span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <span className="text-blue-600 font-bold">STEP 5:</span>
-                        <span><strong>Cost Tracking</strong> (98-99%) - Calculate and track API costs</span>
+                        <span className="text-blue-600 font-bold">STEP 7:</span>
+                        <span><strong>Hunter Email Verifier</strong> (90-92%) - Verify email deliverability</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 8:</span>
+                        <span><strong>Mixedbread Embeddings</strong> (92.5-95%) - Generate vector embeddings for semantic search</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 9:</span>
+                        <span><strong>Database Save</strong> (95-98.5%) - Persist enriched contacts to Supabase</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 10:</span>
+                        <span><strong>Cost Tracking</strong> (98.5-99%) - Calculate and track all API costs</span>
                       </div>
                     </div>
                     <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">⚡ Requirements:</p>
-                      <p className="text-xs text-muted-foreground">Apify API Key + OpenRouter API Key + Apollo API Key (configure in Settings → API Keys)</p>
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">⚡ API Keys Required:</p>
+                      <p className="text-xs text-muted-foreground">Apify + OpenRouter + Apollo + Hunter.io + Mixedbread (Settings → API Keys)</p>
                     </div>
                   </div>
                 </div>

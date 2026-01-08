@@ -185,18 +185,89 @@ The production workflow implements a real, automated pipeline for extracting and
 - **Error Handling**: Graceful degradation if save fails
 - **Progress Tracking**: Update event with shared audience details
 
-**STEP 5: Cost Tracking (98-99% Progress)**
-- **Service-Level Tracking**: Calculates costs for each API service used
+**STEP 6: Hunter.io Email Finder (85-87.5% Progress)**
+- **Find Missing Emails**: Automatically finds email addresses for contacts without email
+- **Professional Email Search**: Uses name + company to find work emails
+- **Data Requirements**: Requires firstName, lastName, and company
+  - Skips contacts with insufficient data
+  - Logs which contacts lack required information
+- **Results Added to Contact**:
+  - `email`: Found email address
+  - `emailFinderScore`: Confidence score (0-100)
+  - `emailFinderSources`: Number of sources found
+- **Success Rate**: Typically 60% for professional contacts
+- **Cost**: $0.02 per email found
+- **Error Handling**: Individual failures don't stop processing
+- **Smart Processing**: Only processes contacts without email
+
+**STEP 7: Hunter.io Email Verifier (90-92% Progress)**
+- **Email Deliverability Check**: Verifies all email addresses are valid and deliverable
+- **Comprehensive Validation**:
+  - SMTP server check
+  - MX records validation
+  - Disposable email detection
+  - Webmail identification (Gmail, Outlook, etc.)
+- **Results Added to Contact**:
+  - `emailVerification.status`: valid, accept_all, unknown, invalid
+  - `emailVerification.score`: 0-100 confidence score
+  - `emailVerification.webmail`: true/false
+  - `emailVerification.disposable`: true/false
+- **Verification Categories**:
+  - **Valid**: Email exists and can receive mail
+  - **Accept All**: Catch-all email (accepts mail to any address)
+  - **Unknown**: Cannot verify (server doesn't allow check)
+  - **Invalid**: Email doesn't exist or mailbox full
+  - **Disposable**: Temporary email (10minutemail, etc.)
+- **Deliverability Rate**: Calculated as (valid + accept_all) / total verified
+- **Cost**: $0.001 per email verified
+- **Quality Gate**: Helps filter out invalid emails before Meta upload
+
+**STEP 8: Mixedbread Embeddings (92.5-95% Progress)**
+- **Vector Embeddings Generation**: Creates semantic vector representations of contacts
+- **Purpose**: Enables semantic search and similarity matching
+- **Model**: mixedbread-ai/mxbai-embed-large-v1 (1024 dimensions)
+- **Batch Processing**: Processes contacts in batches of 10
+- **Results Added to Contact**:
+  - `embedding`: Array of 1024 floating-point numbers
+  - `embeddingModel`: Model name used
+  - `embeddingDimension`: Embedding vector length
+  - `embeddingError`: Error message if generation failed
+- **Similarity Calculation**: Calculates cosine similarity between first two contacts as sample
+- **Token Usage**: ~50 tokens per contact
+- **Cost**: ~$0.00000001/token (very inexpensive)
+- **Use Cases**:
+  - Semantic search: Find contacts similar to a description
+  - Duplicate detection: Find similar contact profiles
+  - Clustering: Group similar contacts together
+- **Error Handling**: Individual embedding failures don't stop overall process
+- **Performance**: Embeddings stored directly in database for fast retrieval
+
+**STEP 9: Database Persistence (95-98.5% Progress)**
+- **Shared Audience Creation**: Creates new `shared_audiences` record
+  - Auto-generated name: "SourceAudience1 + SourceAudience2 - Extracted"
+  - Links to original `source_audience_id`
+  - Stores complete extracted and enriched contacts array
+  - User ID association for RLS compliance
+- **Status Updates**: Updates all processed `source_audiences` to `completed` status
+- **Error Handling**: Graceful degradation if save fails (doesn't prevent job completion)
+- **Timeline Events**: `DATABASE_SAVE_STARTED` and `DATABASE_SAVE_COMPLETED` events
+
+**STEP 10: Cost Tracking (98.5-99% Progress)**
+- **Service-Level Tracking**: Calculates costs for each API service independently
 - **Apify Cost**: ~$0.01 per comment fetched (estimated average)
 - **OpenRouter Cost**: Estimated based on tokens used (~100 tokens per comment)
   - Only tracked if cost > $0.0001 to avoid micro-transactions
 - **Apollo Cost**: $0.03 × number of enrichments performed
-- **Database Storage**: Saves to `cost_tracking` table with:
-  - User ID
-  - Service name (apify, openrouter, apollo)
-  - Operation type (scraping_comments, llm_extraction, contact_enrichment)
-  - Cost amount
-- **Total Calculation**: Sums and logs total cost for the job
+- **Hunter.io Email Finder Cost**: $0.02 × number of emails found
+- **Hunter.io Email Verifier Cost**: $0.001 × number of emails verified
+- **Mixedbread Embeddings Cost**: ~50 tokens per contact × $0.00000001/token
+- **Database Storage**: Saves to `cost_tracking` table:
+  - `user_id`: User who incurred the cost
+  - `service`: Service name (apify, openrouter, apollo, hunter, mixedbread)
+  - `operation`: Operation type (scraping_comments, llm_extraction, contact_enrichment, email_finder, email_verifier, embeddings_generation)
+  - `cost`: Actual cost amount
+- **Total Calculation**: Sums all costs and logs total for the job
+- **Error Resilience**: Cost tracking failures don't prevent job completion
 
 **Production vs Demo Mode:**
 
@@ -205,37 +276,51 @@ The production workflow implements a real, automated pipeline for extracting and
 | Comment Source | Simulated data | Real Apify scraping |
 | Contact Extraction | Mock extraction | Real LLM extraction |
 | Enrichment | Simulated enrichment | Real Apollo.io API |
+| Email Finding | Simulated email finder | Real Hunter.io Email Finder |
+| Email Verification | Simulated verification | Real Hunter.io Verifier |
+| Embeddings | Simulated embeddings | Real Mixedbread embeddings |
 | Database | In-memory only | Persistent Supabase storage |
 | Cost Tracking | Simulated costs | Real cost calculation |
 | API Usage | No API calls | Actual API consumption |
 
 **Workflow Timeline:**
 ```
-0-10%:   Job initialization and Apify token validation
-10-50%:  Comment fetching from all URLs (STEP 1)
-50-55%:  Preparation for LLM extraction
-55-65%:  Contact extraction via OpenRouter (STEP 2)
-65-70%:  Preparation for Apollo enrichment
-70-95%:  Contact enrichment via Apollo.io (STEP 3)
-95-98%:  Database save operations (STEP 4)
-98-99%:  Cost tracking and calculations (STEP 5)
-99-100%: Final completion and cleanup
+0-10%:     Job initialization and Apify token validation
+10-50%:    Comment fetching from all URLs (STEP 1)
+50-55%:    Preparation for LLM extraction
+55-65%:    Contact extraction via OpenRouter (STEP 2)
+65-70%:    Preparation for Apollo enrichment
+70-85%:    Contact enrichment via Apollo.io (STEP 3)
+85-87.5%:  Hunter.io Email Finder (STEP 6)
+87.5-90%:  Preparation for email verification
+90-92%:    Hunter.io Email Verifier (STEP 7)
+92-92.5%:  Preparation for embeddings
+92.5-95%:  Mixedbread Embeddings generation (STEP 8)
+95-98.5%:  Database save operations (STEP 9)
+98.5-99%:  Cost tracking (STEP 10)
+99-100%:   Final completion and cleanup
 ```
 
 **Error Recovery:**
 - **URL Failures**: Individual URL failures don't stop audience processing
 - **Batch Failures**: LLM extraction continues even if batches fail
 - **Enrichment Failures**: Individual enrichment failures tracked separately
+- **Email Finder Failures**: Insufficient data or API errors don't stop processing
+- **Email Verification Failures**: Individual failures tracked, verification marked as unknown
+- **Embedding Failures**: Individual failures tracked with error message
 - **Database Failures**: Logged but don't prevent job completion
 - **Comprehensive Logging**: All errors logged to job timeline
 
 **Requirements:**
-- **Apify API Key**: Required for web scraping
-- **OpenRouter API Key**: Required for LLM extraction
-- **Apollo API Key**: Required for contact enrichment
+- **Apify API Key**: Required for web scraping (Settings → API Keys)
+- **OpenRouter API Key**: Required for LLM extraction (Settings → API Keys)
+- **Apollo API Key**: Required for contact enrichment (Settings → API Keys)
+- **Hunter.io API Key**: Required for email finding and verification (Settings → API Keys)
+- **Mixedbread API Key**: Required for vector embeddings and semantic search (Settings → API Keys)
 - **Valid URLs**: Facebook/Instagram URLs must be publicly accessible
 - **Public Accounts**: Private accounts cannot be scraped
-- **Comment Availability**: Not all posts have comments
+- **Comment Availability**: Not all posts have comments (normal behavior)
+- **Sufficient Contact Data**: Email finder requires firstName, lastName, and company
 
 ---
 

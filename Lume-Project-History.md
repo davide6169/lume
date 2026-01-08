@@ -2047,6 +2047,89 @@ Proprietary - All rights reserved
 **Branch**: `develop`
 **Date**: January 8, 2026
 
+**Update (January 8, 2026) - Complete Production Workflow with Hunter.io & Mixedbread:**
+- **STEP 6: Hunter.io Email Finder Implementation** (85-87.5% progress)
+  - Automatically finds missing email addresses for contacts
+  - Uses firstName + lastName + company to search for professional emails
+  - Skips contacts with insufficient data (logs warning)
+  - Adds `emailFinderScore` and `emailFinderSources` to contact objects
+  - Typical 60% success rate for professional contacts
+  - Cost: $0.02 per email found
+  - Individual failures don't stop processing
+
+- **STEP 7: Hunter.io Email Verifier Implementation** (90-92% progress)
+  - Verifies deliverability of all email addresses
+  - Adds `emailVerification` object with status, score, webmail, disposable
+  - Tracks verification results: valid, accept_all, unknown, invalid, disposable
+  - Calculates deliverability rate: (valid + accept_all) / total
+  - SMTP + MX records validation
+  - Disposable email detection (10minutemail, etc.)
+  - Webmail identification (Gmail, Outlook, etc.)
+  - Cost: $0.001 per email verified
+  - Quality gate before Meta upload
+
+- **STEP 8: Mixedbread Embeddings Implementation** (92.5-95% progress)
+  - Generates vector embeddings for semantic search capability
+  - Uses `mixedbread-ai/mxbai-embed-large-v1` model (1024 dimensions)
+  - Processes contacts in batches of 10
+  - Adds `embedding`, `embeddingModel`, `embeddingDimension` to contacts
+  - Calculates cosine similarity between first two contacts as sample
+  - Token usage: ~50 tokens per contact
+  - Cost: ~$0.00000001/token (very inexpensive)
+  - Individual embedding failures tracked with error message
+  - Enables semantic search, duplicate detection, clustering
+
+- **Enhanced Cost Tracking** (now STEP 10):
+  - Added `totalEmailsFound`, `totalEmailsVerified`, `totalEmbeddingsGenerated` metrics
+  - Hunter.io Email Finder: $0.02 × emails found
+  - Hunter.io Email Verifier: $0.001 × emails verified
+  - Mixedbread Embeddings: estimated tokens × $0.00000001/token
+  - All costs saved to `cost_tracking` table with proper operation types
+
+- **Updated Workflow Timeline**:
+  ```
+  0-10%:     Job initialization + Apify token validation
+  10-50%:    Comment fetching (STEP 1)
+  50-55%:    Preparation for LLM extraction
+  55-65%:    LLM extraction via OpenRouter (STEP 2)
+  65-70%:    Preparation for Apollo enrichment
+  70-85%:    Apollo enrichment (STEP 3)
+  85-87.5%:  Hunter Email Finder (STEP 6) ⭐ NEW
+  87.5-90%:  Preparation for email verification
+  90-92%:    Hunter Email Verifier (STEP 7) ⭐ NEW
+  92-92.5%:  Preparation for embeddings
+  92.5-95%:  Mixedbread Embeddings (STEP 8) ⭐ NEW
+  95-98.5%:  Database save (STEP 9)
+  98.5-99%:  Cost tracking (STEP 10)
+  99-100%:   Final completion
+  ```
+
+- **Updated Production vs Demo Comparison**:
+  - Added Email Finding: Simulated vs Real Hunter.io
+  - Added Email Verification: Simulated vs Real Hunter.io Verifier
+  - Added Embeddings: Simulated vs Real Mixedbread
+
+- **Updated API Key Requirements**:
+  - Apify API Key (web scraping)
+  - OpenRouter API Key (LLM extraction)
+  - Apollo API Key (contact enrichment)
+  - Hunter.io API Key (email finder + verifier) ⭐ NEW
+  - Mixedbread API Key (embeddings) ⭐ NEW
+
+- **Enhanced Error Recovery**:
+  - Email Finder failures: Insufficient data or API errors don't stop processing
+  - Email Verification failures: Individual failures tracked, marked as unknown
+  - Embedding failures: Individual failures tracked with error message
+
+**File Modified**: `app/api/source-audiences/start/route.ts`
+**Lines Added**: 373 lines
+**Lines Removed**: 3 lines (old demo code)
+**Net Change**: +370 lines of production code
+
+**Commit**: `22bb6d9` - "feat: Add Hunter.io and Mixedbread to complete production workflow"
+**Branch**: `develop`
+**Date**: January 8, 2026
+
 ---
 
 ### Version 1.1.5 (January 2026) - Cookie-Based Database Credentials 🍪
