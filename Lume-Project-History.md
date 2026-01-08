@@ -1875,6 +1875,180 @@ Proprietary - All rights reserved
 
 ## Changelog
 
+### Version 1.6.0 (January 8, 2026) - Complete Production Workflow Integration 🚀
+
+**MAJOR RELEASE**: Full implementation of real production workflow replacing all demo code with actual API integrations.
+
+**STEP 1: Real Apify Web Scraping (10-50% Progress)**
+- **Dynamic Source Audience Processing**: Replaced hardcoded Facebook URL with real Source Audiences processing
+  - Iterates through all selected Source Audiences
+  - Processes each URL in every audience
+  - Supports both Facebook and Instagram platforms
+  - Automatic platform detection via URL parsing
+- **ApifyScraperService Integration**:
+  - `fetchFacebookComments()`: Fetch comments from Facebook posts (~$5 per 100 comments)
+  - `fetchInstagramComments()`: Fetch comments from Instagram posts ($1.50 per 1,000 comments)
+  - `parseUrl()`: Determines platform and content type from URL
+  - `validateToken()`: Verifies Apify API key before processing
+- **Configurable Limits**: Respects user-defined scraping limits (default: 100 per platform)
+- **Comprehensive Validation**: Ensures comments were successfully fetched before proceeding
+- **Progress Tracking**: Real-time timeline events for each audience and URL processed
+- **Error Resilience**: Individual URL failures don't stop overall processing
+
+**STEP 2: LLM Contact Extraction (55-65% Progress)**
+- **OpenRouter Integration**: Real LLM-based contact extraction from comments
+  - Model: `mistralai/mistral-7b-instruct:free` (no cost)
+  - Custom extraction prompt for accurate structured data extraction
+- **Batch Processing**: Processes comments in batches of 50 to optimize performance
+  - Prevents overwhelming the LLM with large comment sets
+  - Progress tracking per batch
+- **Structured Extraction**: Extracts from comment text:
+  - First name, last name
+  - Email address
+  - Phone number
+  - Company name
+  - Job title
+- **Smart Parsing**: Handles both pure JSON and markdown code blocks from LLM response
+- **Accumulation**: Builds `extractedContacts` array across all batches
+- **Error Handling**: Continues processing even if individual batches fail
+- **Validation**: Warns if no contacts extracted (may be normal for comments without contact info)
+
+**STEP 3: Apollo Enrichment (70-95% Progress)**
+- **Real Contact Processing**: Replaced `sampleContacts` with actual `extractedContacts`
+- **Per-Contact Enrichment**: Each contact enriched individually via Apollo.io API
+  - `createApolloEnrichmentService()`: Apollo service initialization
+  - `contactToEnrichmentRequest()`: Converts contact to Apollo request format
+  - `enrichPerson()`: Performs enrichment via Apollo API
+- **Data Merging**: Enriched data merged back into contact objects:
+  - Title (job position)
+  - Company name
+  - LinkedIn URL
+  - Phone number (when available)
+  - `enriched: true` flag
+- **Success Tracking**: Monitors successful vs failed enrichments separately
+- **Progress Updates**: Real-time timeline events for each contact
+- **Cost Calculation**: $0.03 per enrichment
+
+**STEP 4: Database Persistence (95-98% Progress)**
+- **Shared Audience Creation**: Creates new `shared_audiences` database record
+  - Auto-generated name: "SourceAudience1 + SourceAudience2 - Extracted"
+  - Links to original `source_audience_id`
+  - Stores complete `extractedContacts` array (JSONB field)
+  - User ID association for RLS compliance
+- **Status Updates**: Updates all processed `source_audiences` to `completed` status
+- **Error Handling**: Graceful degradation if save fails (doesn't prevent job completion)
+- **Timeline Events**: `DATABASE_SAVE_STARTED` and `DATABASE_SAVE_COMPLETED` events
+
+**STEP 5: Cost Tracking (98-99% Progress)**
+- **Service-Level Cost Calculation**: Tracks costs for each API service independently
+- **Apify Cost**: ~$0.01 per comment fetched (estimated average across platforms)
+- **OpenRouter Cost**: Estimated based on tokens used (~100 tokens per comment)
+  - Only tracked if cost > $0.0001 to avoid micro-transactions
+  - Uses `API_PRICING.openrouter.per_token` ($0.0000015/token)
+- **Apollo Cost**: $0.03 × number of enrichments performed
+  - Uses `API_PRICING.apollo.per_enrichment`
+- **Database Storage**: Saves to `cost_tracking` table:
+  - `user_id`: User who incurred the cost
+  - `service`: Service name (apify, openrouter, apollo)
+  - `operation`: Operation type (scraping_comments, llm_extraction, contact_enrichment)
+  - `cost`: Actual cost amount
+- **Total Calculation**: Sums all costs and logs total for the job
+- **Error Resilience**: Cost tracking failures don't prevent job completion
+
+**Technical Implementation Details**:
+- **Metric Tracking Variables**: Added for cross-step data sharing:
+  - `extractedContacts`: Array of extracted contacts (used by Apollo, DB save)
+  - `totalCommentsFetched`: Count for cost calculation
+  - `totalEnrichmentsPerformed`: Count for cost calculation
+- **Workflow Timeline**: Complete 0-100% progress tracking:
+  ```
+  0-10%:   Job initialization and Apify token validation
+  10-50%:  Comment fetching from all URLs (STEP 1)
+  50-55%:  Preparation for LLM extraction
+  55-65%:  Contact extraction via OpenRouter (STEP 2)
+  65-70%:  Preparation for Apollo enrichment
+  70-95%:  Contact enrichment via Apollo.io (STEP 3)
+  95-98%:  Database save operations (STEP 4)
+  98-99%:  Cost tracking and calculations (STEP 5)
+  99-100%: Final completion and cleanup
+  ```
+- **Error Recovery**: Multiple layers of error handling:
+  - URL failures don't stop audience processing
+  - LLM batch failures don't stop extraction
+  - Enrichment failures tracked but don't stop processing
+  - Database save failures logged but don't fail job
+  - All errors logged to job timeline for debugging
+
+**Code Changes**:
+- **File**: `app/api/source-audiences/start/route.ts`
+- **Lines Added**: 453 lines
+- **Lines Removed**: 115 lines (demo code)
+- **Net Change**: +338 lines of production code
+- **Functions Modified**: `processSearchJob()` - Complete workflow rewrite
+
+**Production vs Demo Mode Comparison**:
+
+| Feature | Demo Mode | Production Mode |
+|---------|-----------|-----------------|
+| Comment Source | Simulated data | Real Apify scraping |
+| Contact Extraction | Mock extraction | Real OpenRouter LLM |
+| Enrichment | Simulated enrichment | Real Apollo.io API |
+| Database | In-memory only | Persistent Supabase |
+| Cost Tracking | Simulated costs | Real API costs |
+| API Usage | No external calls | Actual API consumption |
+| Progress Tracking | Simulated progress | Real-time operation updates |
+
+**Requirements for Production Mode**:
+- **Apify API Key**: Required for web scraping (Settings → API Keys)
+- **OpenRouter API Key**: Required for LLM extraction (Settings → API Keys)
+- **Apollo API Key**: Required for contact enrichment (Settings → API Keys)
+- **Valid URLs**: Facebook/Instagram URLs must be publicly accessible
+- **Public Accounts**: Private accounts cannot be scraped
+- **Comment Availability**: Not all posts have comments (normal behavior)
+
+**Testing Recommendations**:
+1. Start with small scraping limits (10-20 comments per platform)
+2. Use Instagram accounts with high engagement (e.g., @garyvee)
+3. Use popular Facebook pages with active comments
+4. Verify API keys are valid in Settings before processing
+5. Monitor job timeline for progress and errors
+6. Check Cost Tracking dashboard after job completes
+
+**Migration Notes**:
+- Demo mode continues to work as before
+- No breaking changes to existing functionality
+- Users can switch between demo and production mode
+- Database schema unchanged (no migrations required)
+- Existing demo data unaffected
+
+**Known Limitations**:
+- LLM extraction accuracy depends on comment quality
+- Some comments may not contain contact information (normal)
+- Apollo free tier has API rate limits
+- Private accounts cannot be scraped
+- Not all posts have comments
+
+**Future Enhancements**:
+- Hunter.io email finding for missing emails
+- Hunter.io email verification before Meta upload
+- Mixedbread AI embeddings for semantic search
+- CSV export of enriched contacts
+- Direct upload to Meta Custom Audiences
+
+**Documentation Updates**:
+- Added "Production Workflow" section to Lume-Project.md
+- Updated version to v1.6.0
+- Added detailed workflow timeline
+- Documented all 5 steps with progress tracking
+- Added error recovery strategies
+- Updated production vs demo mode comparison
+
+**Commit**: `d1eba1c` - "feat: Implement complete production workflow with real Apify integration"
+**Branch**: `develop`
+**Date**: January 8, 2026
+
+---
+
 ### Version 1.1.5 (January 2026) - Cookie-Based Database Credentials 🍪
 - **Server-Side Database Credentials**: Implemented cookie-based storage for user-configured database
   - Encrypted httpOnly cookie stores Supabase credentials

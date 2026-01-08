@@ -762,15 +762,35 @@ export default function DocsPage() {
                     <span className="text-2xl font-bold text-blue-600">3</span>
                   </div>
                   <div className="flex-1 pb-8">
-                    <h4 className="font-semibold mb-1">AI Processing</h4>
+                    <h4 className="font-semibold mb-1">AI-Powered Production Workflow</h4>
                     <p className="text-sm text-muted-foreground mb-2">
-                      System automatically extracts, filters, and enriches contacts:
+                      Real production pipeline extracts and enriches contacts from social media:
                     </p>
                     <div className="text-sm space-y-1 ml-4">
-                      <p>✓ Extracts from social media posts/comments</p>
-                      <p>✓ Filters partial contacts (missing email/name)</p>
-                      <p>✓ Enriches missing data (Hunter Finder + Apollo)</p>
-                      <p>✓ Verifies email validity (Hunter Verifier)</p>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 1:</span>
+                        <span><strong>Apify Scraping</strong> (10-50%) - Fetch real comments from Facebook/Instagram URLs</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 2:</span>
+                        <span><strong>LLM Extraction</strong> (55-65%) - Extract contacts using OpenRouter AI (mistral-7b-instruct:free)</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 3:</span>
+                        <span><strong>Apollo Enrichment</strong> (70-95%) - Add professional data (title, company, LinkedIn)</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 4:</span>
+                        <span><strong>Database Save</strong> (95-98%) - Persist enriched contacts to Supabase</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 font-bold">STEP 5:</span>
+                        <span><strong>Cost Tracking</strong> (98-99%) - Calculate and track API costs</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">⚡ Requirements:</p>
+                      <p className="text-xs text-muted-foreground">Apify API Key + OpenRouter API Key + Apollo API Key (configure in Settings → API Keys)</p>
                     </div>
                   </div>
                 </div>

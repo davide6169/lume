@@ -28,8 +28,8 @@ A complete multi-tenant SaaS platform for extracting, enriching, and managing co
 - Build custom audiences for Meta advertising campaigns
 - Track and manage all associated costs automatically
 
-**Current Version:** v1.5.0
-**Last Updated:** January 2026
+**Current Version:** v1.6.0
+**Last Updated:** January 8, 2026
 **License:** Proprietary
 
 ---
@@ -125,6 +125,117 @@ Create and manage source audiences from social media URLs:
 - Automatic removal of partial contacts
 - CSV export of discarded contacts for review
 - Meta compliance (email + first_name + last_name required)
+
+---
+
+### 3.5 Production Workflow (NEW v1.6.0)
+
+**Complete End-to-End Pipeline:**
+
+The production workflow implements a real, automated pipeline for extracting and enriching contacts from social media platforms:
+
+**STEP 1: Apify Web Scraping (10-50% Progress)**
+- **Source Audience Processing**: Iterates through all selected Source Audiences
+- **Multi-URL Support**: Processes each URL in every audience
+- **Platform Detection**: Automatically detects Facebook vs Instagram URLs
+- **Comment Fetching**: Uses ApifyScraperService to fetch real comments
+  - Facebook: `fetchFacebookComments()` - ~$5 per 100 comments
+  - Instagram: `fetchInstagramComments()` - $1.50 per 1,000 comments
+- **Configurable Limits**: Respects user-defined scraping limits (default: 100 per platform)
+- **Validation**: Ensures comments were successfully fetched before proceeding
+- **Progress Tracking**: Real-time updates for each audience and URL processed
+- **Error Handling**: Continues processing even if individual URLs fail
+
+**STEP 2: LLM Contact Extraction (55-65% Progress)**
+- **Batch Processing**: Processes comments in batches of 50 to optimize LLM usage
+- **OpenRouter Integration**: Uses `mistralai/mistral-7b-instruct:free` model
+- **Structured Extraction**: Extracts from comment text:
+  - First name
+  - Last name
+  - Email address
+  - Phone number
+  - Company name
+  - Job title
+- **Extraction Prompt**: Custom system prompt ensures accurate extraction
+- **JSON Parsing**: Handles both pure JSON and markdown code blocks
+- **Accumulation**: Builds `extractedContacts` array across all batches
+- **Fallback**: Continues even if individual batches fail
+- **Validation**: Warns if no contacts extracted (may be normal for comments without contact info)
+
+**STEP 3: Apollo Enrichment (70-95% Progress)**
+- **Real Contact Processing**: Enriches actually extracted contacts (not demo data)
+- **Per-Contact Enrichment**: Each contact enriched individually via Apollo.io
+- **Data Merging**: Enriched data merged back into contact objects:
+  - Title (job position)
+  - Company name
+  - LinkedIn URL
+  - Phone number (when available)
+- **Success Tracking**: Monitors successful vs failed enrichments
+- **Progress Updates**: Real-time progress for each contact enriched
+- **Cost Tracking**: $0.03 per enrichment
+- **Error Handling**: Individual failures don't stop overall process
+
+**STEP 4: Database Persistence (95-98% Progress)**
+- **Shared Audience Creation**: Creates new `shared_audiences` record
+  - Auto-generated name: "SourceAudience1 + SourceAudience2 - Extracted"
+  - Links to original source audience
+  - Stores complete extracted and enriched contacts array
+- **Status Updates**: Updates all source audiences to `completed` status
+- **User Association**: Properly associates with user ID
+- **Error Handling**: Graceful degradation if save fails
+- **Progress Tracking**: Update event with shared audience details
+
+**STEP 5: Cost Tracking (98-99% Progress)**
+- **Service-Level Tracking**: Calculates costs for each API service used
+- **Apify Cost**: ~$0.01 per comment fetched (estimated average)
+- **OpenRouter Cost**: Estimated based on tokens used (~100 tokens per comment)
+  - Only tracked if cost > $0.0001 to avoid micro-transactions
+- **Apollo Cost**: $0.03 × number of enrichments performed
+- **Database Storage**: Saves to `cost_tracking` table with:
+  - User ID
+  - Service name (apify, openrouter, apollo)
+  - Operation type (scraping_comments, llm_extraction, contact_enrichment)
+  - Cost amount
+- **Total Calculation**: Sums and logs total cost for the job
+
+**Production vs Demo Mode:**
+
+| Feature | Demo Mode | Production Mode |
+|---------|-----------|-----------------|
+| Comment Source | Simulated data | Real Apify scraping |
+| Contact Extraction | Mock extraction | Real LLM extraction |
+| Enrichment | Simulated enrichment | Real Apollo.io API |
+| Database | In-memory only | Persistent Supabase storage |
+| Cost Tracking | Simulated costs | Real cost calculation |
+| API Usage | No API calls | Actual API consumption |
+
+**Workflow Timeline:**
+```
+0-10%:   Job initialization and Apify token validation
+10-50%:  Comment fetching from all URLs (STEP 1)
+50-55%:  Preparation for LLM extraction
+55-65%:  Contact extraction via OpenRouter (STEP 2)
+65-70%:  Preparation for Apollo enrichment
+70-95%:  Contact enrichment via Apollo.io (STEP 3)
+95-98%:  Database save operations (STEP 4)
+98-99%:  Cost tracking and calculations (STEP 5)
+99-100%: Final completion and cleanup
+```
+
+**Error Recovery:**
+- **URL Failures**: Individual URL failures don't stop audience processing
+- **Batch Failures**: LLM extraction continues even if batches fail
+- **Enrichment Failures**: Individual enrichment failures tracked separately
+- **Database Failures**: Logged but don't prevent job completion
+- **Comprehensive Logging**: All errors logged to job timeline
+
+**Requirements:**
+- **Apify API Key**: Required for web scraping
+- **OpenRouter API Key**: Required for LLM extraction
+- **Apollo API Key**: Required for contact enrichment
+- **Valid URLs**: Facebook/Instagram URLs must be publicly accessible
+- **Public Accounts**: Private accounts cannot be scraped
+- **Comment Availability**: Not all posts have comments
 
 ---
 
