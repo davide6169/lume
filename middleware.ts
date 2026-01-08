@@ -1,12 +1,40 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { publicEnv, hasRealApiKeys } from '@/lib/config/env'
+import { verifyDemoToken } from '@/lib/auth/demo-auth'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
 
+  const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
+                     request.nextUrl.pathname.startsWith('/signup') ||
+                     request.nextUrl.pathname.startsWith('/account-pending')
+
+  // Check for demo token first
+  const demoToken = request.cookies.get('demo_token')?.value
+  let demoUser = null
+
+  if (demoToken) {
+    demoUser = await verifyDemoToken(demoToken)
+  }
+
+  // If demo user is authenticated, skip Supabase auth check
+  if (demoUser) {
+    // Demo user is authenticated
+    // Redirect to home if on auth pages
+    if (isAuthPage) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+
+    // Allow access to protected routes
+    return supabaseResponse
+  }
+
+  // Normal Supabase authentication flow
   // Always create Supabase client and check authentication
   // Even in demo mode, users must be authenticated to access protected routes
   const supabase = createServerClient(
@@ -35,10 +63,6 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
-                     request.nextUrl.pathname.startsWith('/signup') ||
-                     request.nextUrl.pathname.startsWith('/account-pending')
 
   // Redirect to login if not authenticated
   if (!user && !isAuthPage) {

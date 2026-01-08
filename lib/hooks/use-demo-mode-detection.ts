@@ -5,8 +5,10 @@ import { useSettingsStore } from '@/lib/stores/useSettingsStore'
 import { useDemoStore } from '@/lib/stores/useDemoStore'
 
 /**
- * Hook that automatically manages demo mode based on API key configuration
- * - If env vars have placeholders → Demo mode is forced ON
+ * Hook that automatically manages demo mode based on:
+ * 1. Demo user authentication (JWT token in cookie)
+ * 2. API key configuration
+ * - If user is demo user OR env vars have placeholders → Demo mode is forced ON
  * - If user has configured keys in settings → Demo mode can be toggled
  */
 export function useDemoModeDetection() {
@@ -14,19 +16,32 @@ export function useDemoModeDetection() {
   const { isDemoMode, setIsDemoMode } = useDemoStore()
 
   useEffect(() => {
-    // Check if any API keys are configured in settings
-    const hasUserConfiguredKeys = Object.keys(apiKeys).length > 0 &&
-      Object.values(apiKeys).some(key => key && key.length > 0 && !key.startsWith('your-'))
+    const checkDemoStatus = async () => {
+      try {
+        // Check if current user is a demo user
+        const response = await fetch('/api/user/demo')
+        const data = await response.json()
 
-    // Check if environment is using placeholders (server-side check)
-    // We can't directly check server env vars from client, so we rely on:
-    // 1. User has configured keys in settings → allow production mode
-    // 2. No keys configured → keep demo mode on
+        if (data.isDemo) {
+          // User is authenticated as demo user - force demo mode ON
+          setIsDemoMode(true)
+          return
+        }
 
-    if (!hasUserConfiguredKeys && !isDemoMode) {
-      // No keys configured and demo mode is off - force it on
-      setIsDemoMode(true)
+        // Check if any API keys are configured in settings
+        const hasUserConfiguredKeys = Object.keys(apiKeys).length > 0 &&
+          Object.values(apiKeys).some(key => key && key.length > 0 && !key.startsWith('your-'))
+
+        // No keys configured and demo mode is off - force it on
+        if (!hasUserConfiguredKeys && !isDemoMode) {
+          setIsDemoMode(true)
+        }
+      } catch (error) {
+        console.error('Failed to check demo status:', error)
+      }
     }
+
+    checkDemoStatus()
   }, [apiKeys, isDemoMode, setIsDemoMode])
 
   return {
