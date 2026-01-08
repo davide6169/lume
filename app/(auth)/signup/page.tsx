@@ -4,16 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LumeLogo } from '@/components/icons/lume-logo'
-import { ConfigurationRequiredAlert } from '@/components/common/ConfigurationRequiredAlert'
 import Link from 'next/link'
 
 export default function SignupPage() {
-  // Verifica se le environment variables sono configurate
-  const isConfigured = !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4">
       <Card className="w-full max-w-md">
@@ -29,60 +22,54 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isConfigured ? (
-            <ConfigurationRequiredAlert type="auth" />
-          ) : (
-            <>
-              <form action={signup} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    placeholder="John Doe"
-                    required
-                    autoComplete="name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Create a password"
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Password must be at least 6 characters long
-                  </p>
-                </div>
-                <Button type="submit" className="w-full">
-                  Create Account
-                </Button>
-              </form>
-              <div className="mt-4 text-center text-sm">
-                <span className="text-muted-foreground">Already have an account? </span>
-                <Link href="/login" className="text-blue-600 hover:underline font-medium">
-                  Sign in
-                </Link>
-              </div>
-            </>
-          )}
+          <form action={signup} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                name="fullName"
+                type="text"
+                placeholder="John Doe"
+                required
+                autoComplete="name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="name@example.com"
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Create a password"
+                required
+                minLength={6}
+                autoComplete="new-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 6 characters long
+              </p>
+            </div>
+            <Button type="submit" className="w-full">
+              Create Account
+            </Button>
+          </form>
+          <div className="mt-4 text-center text-sm">
+            <span className="text-muted-foreground">Already have an account? </span>
+            <Link href="/login" className="text-blue-600 hover:underline font-medium">
+              Sign in
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
