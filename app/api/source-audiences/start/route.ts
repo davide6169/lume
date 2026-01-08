@@ -796,52 +796,194 @@ async function processSearchJob(jobId: string, userId: string) {
             throw error
           }
 
-          // Demonstrate Facebook post fetching with Apify
-          const sampleFacebookUrl = 'https://www.facebook.com/20531316728/posts/10158264921766728/'
+          // Initialize OpenRouter production service if API key available
+          let openrouterService = null
+          if (apiKeys?.openrouter) {
+            openrouterService = createOpenRouterService(apiKeys.openrouter)
+            console.log('[JobProcessor] OpenRouter production service initialized')
+          }
 
-          update(20, {
-            timestamp: new Date().toISOString(),
-            event: 'APIFY_FETCH_STARTED',
-            details: {
-              provider: 'Apify',
-              platform: 'Facebook',
-              url: sampleFacebookUrl
+          // Process each Source Audience
+          let allFetchedComments: any[] = []
+
+          for (let i = 0; i < sourceAudiences.length; i++) {
+            const audience: any = sourceAudiences[i]
+            const audienceProgress = 10 + ((i / sourceAudiences.length) * 40)
+
+            console.log(`[JobProcessor] Processing audience: ${audience.name} (${audience.type})`)
+
+            update(audienceProgress, {
+              timestamp: new Date().toISOString(),
+              event: 'AUDIENCE_PROCESSING_STARTED',
+              details: {
+                audienceName: audience.name,
+                audienceId: audience.id,
+                urlCount: audience.urls.length,
+                platform: audience.type
+              }
+            })
+
+            // Process each URL in the audience
+            for (let j = 0; j < audience.urls.length; j++) {
+              const url = audience.urls[j]
+              const urlProgress = audienceProgress + ((j / audience.urls.length) * 5)
+
+              console.log(`[JobProcessor] Processing URL ${j + 1}/${audience.urls.length}: ${url}`)
+
+              try {
+                // Parse URL to determine platform and type
+                const parsedUrl = apifyService.parseUrl(url)
+                console.log('[JobProcessor] Parsed URL:', { url, parsed: parsedUrl })
+
+                update(urlProgress, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APIFY_FETCH_STARTED',
+                  details: {
+                    provider: 'Apify',
+                    platform: parsedUrl.platform,
+                    url: url,
+                    urlIndex: j + 1
+                  }
+                })
+
+                // Fetch comments based on platform
+                let comments: any[] = []
+                if (parsedUrl.platform === 'facebook') {
+                  comments = await apifyService.fetchFacebookComments(url, {
+                    limit: scrapingLimits.facebook
+                  })
+                } else if (parsedUrl.platform === 'instagram') {
+                  comments = await apifyService.fetchInstagramComments(url, {
+                    limit: scrapingLimits.instagram
+                  })
+                }
+
+                console.log(`[JobProcessor] Fetched ${comments.length} comments from ${url}`)
+                allFetchedComments.push(...comments)
+
+                update(urlProgress + 2, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APIFY_FETCH_COMPLETED',
+                  details: {
+                    provider: 'Apify',
+                    platform: parsedUrl.platform,
+                    url: url,
+                    commentsFetched: comments.length,
+                    totalComments: allFetchedComments.length
+                  }
+                })
+              } catch (error) {
+                console.error(`[JobProcessor] Failed to fetch from ${url}:`, error)
+                update(urlProgress, {
+                  timestamp: new Date().toISOString(),
+                  event: 'APIFY_FETCH_FAILED',
+                  details: {
+                    provider: 'Apify',
+                    url: url,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                  }
+                })
+              }
             }
-          })
 
-          try {
-            const parsedUrl = apifyService.parseUrl(sampleFacebookUrl)
-            console.log('[JobProcessor] Parsed Facebook URL:', parsedUrl)
-
-            // Fetch comments from the post using Apify
-            const comments = await apifyService.fetchFacebookComments(parsedUrl.id, { limit: scrapingLimits.facebook })
-
-            console.log('[JobProcessor] Fetched Facebook comments:', comments.length)
-
-            update(25, {
+            update(audienceProgress + 5, {
               timestamp: new Date().toISOString(),
-              event: 'APIFY_FETCH_COMPLETED',
+              event: 'AUDIENCE_PROCESSING_COMPLETED',
               details: {
-                provider: 'Apify',
-                platform: 'Facebook',
-                resourceType: 'post comments',
-                commentsFetched: comments.length,
-                sampleComments: comments.slice(0, 3).map(c => ({
-                  from: c.from.name,
-                  message: c.message.substring(0, 100) + '...'
-                }))
+                audienceName: audience.name,
+                totalCommentsFetched: allFetchedComments.length
               }
             })
-          } catch (error) {
-            console.error('[JobProcessor] Exception during Apify fetch:', error)
-            update(25, {
+          }
+
+          console.log(`[JobProcessor] Total comments fetched: ${allFetchedComments.length}`)
+
+          // Extract contacts from comments using LLM
+          if (openrouterService && allFetchedComments.length > 0) {
+            console.log('[JobProcessor] Starting LLM extraction from comments')
+
+            update(55, {
               timestamp: new Date().toISOString(),
-              event: 'APIFY_FETCH_FAILED',
+              event: 'LLM_EXTRACTION_STARTED',
               details: {
-                provider: 'Apify',
-                error: error instanceof Error ? error.message : 'Unknown error'
+                provider: 'OpenRouter',
+                model: 'mistralai/mistral-7b-instruct:free',
+                commentsCount: allFetchedComments.length
               }
             })
+
+            // Prepare comments text for LLM
+            const commentsText = allFetchedComments
+              .slice(0, 100) // Limit to 100 comments for LLM
+              .map((c: any, idx: number) => {
+                const text = c.text || c.message || ''
+                const author = c.from?.name || c.ownerUsername || c.username || `User${idx}`
+                return `${author}: ${text}`
+              })
+              .join('\n\n')
+
+            const extractionPrompt = `Extract contact information from these social media comments. Look for:
+- Email addresses
+- Phone numbers
+- Names
+- Companies mentioned
+- Locations
+
+Comments:
+${commentsText}
+
+Return a JSON array of contacts with this exact structure:
+[
+  {
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "city": "Milan",
+    "country": "Italy",
+    "interests": ["tech", "marketing"]
+  }
+]
+
+Only include contacts that have at least an email OR phone number. Return ONLY the JSON array, no other text.`
+
+            try {
+              const llmResult = await openrouterService.chatCompletion({
+                model: 'mistralai/mistral-7b-instruct:free',
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'You are a data extraction expert. Extract contact information from social media comments and return ONLY valid JSON arrays.'
+                  },
+                  {
+                    role: 'user',
+                    content: extractionPrompt
+                  }
+                ]
+              })
+
+              console.log('[JobProcessor] LLM extraction completed')
+
+              update(65, {
+                timestamp: new Date().toISOString(),
+                event: 'LLM_EXTRACTION_COMPLETED',
+                details: {
+                  provider: 'OpenRouter',
+                  model: 'mistralai/mistral-7b-instruct:free',
+                  contactsExtracted: llmResult.choices[0].message.content
+                }
+              })
+            } catch (error) {
+              console.error('[JobProcessor] LLM extraction failed:', error)
+              update(65, {
+                timestamp: new Date().toISOString(),
+                event: 'LLM_EXTRACTION_FAILED',
+                details: {
+                  provider: 'OpenRouter',
+                  error: error instanceof Error ? error.message : 'Unknown error'
+                }
+              })
+            }
           }
         } else {
           console.log('[JobProcessor] No Apify API key provided, skipping Apify integration')
