@@ -250,7 +250,8 @@ export class ApifyScraperService {
       throw responseData
     }
 
-    return responseData
+    // Apify wraps the run object in a "data" property
+    return responseData.data
   }
 
   // ============================================
@@ -360,7 +361,8 @@ export class ApifyScraperService {
       throw responseData
     }
 
-    return responseData
+    // Apify wraps the run object in a "data" property
+    return responseData.data
   }
 
   // ============================================

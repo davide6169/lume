@@ -364,7 +364,7 @@ export type Optional<T> = T | undefined;
 
 export interface ParsedMetaUrl {
   platform: 'facebook' | 'instagram';
-  type: 'page' | 'group' | 'post' | 'profile' | 'media';
+  type: 'page' | 'group' | 'post' | 'profile' | 'reel' | 'media';
   id: string;
   username?: string;
 }
