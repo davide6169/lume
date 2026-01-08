@@ -436,7 +436,9 @@ export class ApifyScraperService {
         throw new Error(`Failed to check run status: ${response.statusText}`)
       }
 
-      const run: ApifyRunResponse = await response.json()
+      // Apify wraps the run object in a "data" property
+      const responseData = await response.json()
+      const run: ApifyRunResponse = responseData.data
 
       console.log('[Apify] Run status update:', {
         runId,
