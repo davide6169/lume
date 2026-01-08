@@ -138,6 +138,22 @@ export class ApifyScraperService {
       throw new Error('URL must be an Instagram URL')
     }
 
+    // Check if URL is a profile (not supported)
+    if (parsed.type === 'profile') {
+      throw new Error(
+        'Instagram profile URLs are not supported. Please use a specific post URL.\n' +
+        'Supported formats:\n' +
+        '  - https://www.instagram.com/p/ABC123/ (post)\n' +
+        '  - https://www.instagram.com/reel/ABC123/ (reel)\n' +
+        'To get a post URL:\n' +
+        '  1. Open Instagram\n' +
+        '  2. Find a post with comments\n' +
+        '  3. Click the three dots (•••) on the post\n' +
+        '  4. Select "Copy link"\n' +
+        '  5. Paste that URL here'
+      )
+    }
+
     try {
       // Start Apify Instagram scraper
       const run = await this.startInstagramScraper(url, options)
@@ -231,6 +247,21 @@ export class ApifyScraperService {
 
     if (parsed.platform !== 'facebook') {
       throw new Error('URL must be a Facebook URL')
+    }
+
+    // Check if URL is a page or group (only posts are supported)
+    if (parsed.type === 'page' || parsed.type === 'group') {
+      throw new Error(
+        'Facebook page and group URLs are not supported. Please use a specific post URL.\n' +
+        'Supported format:\n' +
+        '  - https://www.facebook.com/{page}/posts/{post_id} (post)\n' +
+        'To get a post URL:\n' +
+        '  1. Open Facebook\n' +
+        '  2. Find a post with comments\n' +
+        '  3. Click the date/timestamp on the post\n' +
+        '  4. Copy the URL from the address bar\n' +
+        '  5. Paste that URL here'
+      )
     }
 
     try {

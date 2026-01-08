@@ -157,22 +157,41 @@ export function CreateSourceAudienceDialog({ onCreate }: CreateSourceAudienceDia
               <Label htmlFor="urls">URLs *</Label>
               <Textarea
                 id="urls"
-                placeholder={`https://www.facebook.com/group1&#10;https://www.facebook.com/group2&#10;# This is a comment and will be ignored`}
+                placeholder={type === 'instagram'
+                  ? `https://www.instagram.com/p/ABC123/&#10;https://www.instagram.com/reel/ABC123/&#10;# Each URL must be a specific post or reel`
+                  : `https://www.facebook.com/pageName/posts/123456&#10;# Each URL must be a specific post with comments`
+                }
                 value={urls}
                 onChange={(e) => setUrls(e.target.value)}
                 rows={8}
                 required
                 className="font-mono text-sm"
               />
-              <p className="text-xs text-muted-foreground">
-                Enter one URL per line. Empty lines and lines starting with # will be ignored.
-                {urls.split('\n').filter((u) => u.trim() && !u.trim().startsWith('#')).length > 0 && (
-                  <span className="font-medium text-foreground ml-1">
-                    ({urls.split('\n').filter((u) => u.trim() && !u.trim().startsWith('#')).length} URLs
-                    detected)
-                  </span>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Enter one URL per line. Empty lines and lines starting with # will be ignored.
+                  {urls.split('\n').filter((u) => u.trim() && !u.trim().startsWith('#')).length > 0 && (
+                    <span className="font-medium text-foreground ml-1">
+                      ({urls.split('\n').filter((u) => u.trim() && !u.trim().startsWith('#')).length} URLs
+                      detected)
+                    </span>
+                  )}
+                </p>
+                {type === 'instagram' && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    <strong>⚠️ Important:</strong> Only post and reel URLs are supported. Profile URLs like instagram.com/username will NOT work.
+                    <br />
+                    To get a post URL: Open Instagram → Find a post → Click ••• → Copy link
+                  </p>
                 )}
-              </p>
+                {type === 'facebook' && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    <strong>⚠️ Important:</strong> Only specific post URLs are supported. Page or group URLs will NOT work.
+                    <br />
+                    To get a post URL: Open Facebook → Find a post → Click the timestamp → Copy URL from address bar
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
