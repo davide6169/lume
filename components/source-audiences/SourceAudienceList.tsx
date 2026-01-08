@@ -681,14 +681,24 @@ export function SourceAudienceList() {
       totalContacts: 0
     }
 
-    // Get total sources from initial SEARCH_STARTED event
-    const startedEvent = jobData.timeline?.find((e: any) => e.event === 'SEARCH_STARTED')
-    if (startedEvent?.details?.audiencesCount) {
-      stats.totalSources = startedEvent.details.audiencesCount
+    // Find the LAST SEARCH_STARTED event to filter out old job data
+    const searchStartedEvents = jobData.timeline?.filter((e: any) => e.event === 'SEARCH_STARTED') || []
+    const lastStartedEvent = searchStartedEvents[searchStartedEvents.length - 1]
+
+    if (lastStartedEvent?.details?.audiencesCount) {
+      stats.totalSources = lastStartedEvent.details.audiencesCount
     }
 
-    // Count completed sources and gather URLs/contacts from timeline
-    jobData.timeline?.forEach((event: any) => {
+    // Get the index of the last SEARCH_STARTED event
+    const lastStartedIndex = jobData.timeline?.findLastIndex((e: any) => e.event === 'SEARCH_STARTED') ?? -1
+
+    // Only count events AFTER the last SEARCH_STARTED to avoid counting old job data
+    const relevantTimeline = lastStartedIndex >= 0
+      ? jobData.timeline?.slice(lastStartedIndex)
+      : jobData.timeline
+
+    // Count completed sources and gather URLs/contacts from relevant timeline
+    relevantTimeline?.forEach((event: any) => {
       if (event.event === 'AUDIENCE_PROCESSING_COMPLETED') {
         stats.completedSources++
         if (event.details?.contactsFound) {

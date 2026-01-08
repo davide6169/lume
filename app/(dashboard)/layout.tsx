@@ -39,6 +39,14 @@ import {
   Shield,
 } from 'lucide-react'
 
+function LogoutForm({ children }: { children: React.ReactNode }) {
+  return (
+    <form action={logout} className="w-full">
+      {children}
+    </form>
+  )
+}
+
 const navItems = [
   {
     name: 'Dashboard',
@@ -239,10 +247,14 @@ export default function DashboardLayout({
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="cursor-pointer text-destructive" onClick={logout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign out
-                  </DropdownMenuItem>
+                  <LogoutForm>
+                    <DropdownMenuItem asChild>
+                      <button type="submit" className="cursor-pointer text-destructive w-full text-left flex items-center px-2 py-2 text-sm">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign out
+                      </button>
+                    </DropdownMenuItem>
+                  </LogoutForm>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
