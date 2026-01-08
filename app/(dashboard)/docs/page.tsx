@@ -313,6 +313,32 @@ export default function DocsPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <h4 className="font-semibold">Server-Side Database Credentials (v1.1.5+)</h4>
+                  <Badge>Full Auth Support</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    After configuring the database, credentials are stored in an encrypted httpOnly cookie, enabling complete authentication:
+                  </p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• <strong>Encrypted Cookie Storage</strong> - AES-256 encrypted httpOnly cookie stores database credentials</li>
+                    <li>• <strong>Server Access</strong> - Server can read credentials for Supabase auth without env variables</li>
+                    <li>• <strong>30-Day Persistence</strong> - Credentials persist across sessions with automatic refresh</li>
+                    <li>• <strong>Dynamic Login Page</strong> - Shows "Sign up" link only when database is configured</li>
+                    <li>• <strong>Full Multi-User Support</strong> - Multiple users can sign up and authenticate after setup</li>
+                  </ul>
+                  <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
+                    <strong>Authentication Flow:</strong> First access: Demo login only → Configure database → Cookie saved → Full auth enabled (signup + normal login)
+                  </div>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                    🍪 This enables true zero-config deployment with full multi-tenant authentication support after initial database configuration.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

@@ -1875,6 +1875,60 @@ Proprietary - All rights reserved
 
 ## Changelog
 
+### Version 1.1.5 (January 2026) - Cookie-Based Database Credentials 🍪
+- **Server-Side Database Credentials**: Implemented cookie-based storage for user-configured database
+  - Encrypted httpOnly cookie stores Supabase credentials
+  - Server can read credentials for authentication without env variables
+  - Enables true zero-config Vercel deployment with full auth support
+- **Dynamic Login Page**: Login page now detects database configuration status
+  - Shows "Sign up" link only when database is configured
+  - Hides "Sign up" for first-time setup (demo access only)
+  - Info alert guides users to configure database first
+- **Complete Auth Flow**: Full user registration and authentication after database setup
+  - Demo login → Configure database → Cookie saved → Full auth available
+  - Server uses cookie credentials for all Supabase operations
+  - Signup and login work normally after initial configuration
+- **Seamless Transition**: Smooth path from demo mode to production multi-tenant
+  - Users don't need to re-enter database credentials after logout
+  - Cookie persists for 30 days with auto-refresh
+  - No server-side environment variables required for user databases
+
+**Implementation Details:**
+- Created `lib/utils/db-credentials-cookie.ts` for encrypted cookie management
+- Updated `createSupabaseServerClient()` to read from cookie first, then env vars
+- Modified `setSupabaseConfig()` in useSettingsStore to save to both localStorage and cookie
+- Added `/api/settings/save-db-credentials` for server-side cookie operations
+- Added `/api/settings/db-configured` endpoint for client-side status check
+- Login page now client component that queries DB configuration status
+
+**Security Features:**
+- AES-256 encryption for credentials in cookie
+- httpOnly flag prevents XSS access
+- secure flag in production environments
+- 30-day expiration with automatic refresh
+- Fallback to environment variables when no cookie present
+
+**Deployment Impact:**
+- Vercel deployments require ONLY demo env variables (not database variables)
+- First user configures their own database via Settings
+- That database becomes the shared instance for that deployment
+- Multiple users can then sign up and authenticate to that database
+- Perfect for dedicated client deployments with zero server configuration
+
+**Updated Files:**
+- `lib/utils/db-credentials-cookie.ts`: New cookie management utility
+- `lib/supabase/server.ts`: Updated to read from cookie
+- `lib/stores/useSettingsStore.ts`: Async functions for cookie sync
+- `app/api/settings/save-db-credentials/route.ts`: Server-side cookie operations
+- `app/api/settings/db-configured/route.ts`: Status check endpoint
+- `app/(auth)/login/page.tsx`: Client component with dynamic signup link
+
+**Use Cases Enabled:**
+1. Single-tenant dedicated deployment (one database per Vercel instance)
+2. Multiple users per deployment after initial setup
+3. No server-side credential management needed
+4. Each deployment completely isolated from others
+
 ### Version 1.1.4 (January 2026) - Production Demo Authentication 🔐
 - **JWT-based Demo Authentication**: Implemented secure demo account system for production deployments
   - Hardcoded JWT secret committed to GitHub for demo access

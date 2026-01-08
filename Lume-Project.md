@@ -28,7 +28,7 @@ A complete multi-tenant SaaS platform for extracting, enriching, and managing co
 - Build custom audiences for Meta advertising campaigns
 - Track and manage all associated costs automatically
 
-**Current Version:** v1.4.0
+**Current Version:** v1.5.0
 **Last Updated:** January 2026
 **License:** Proprietary
 
@@ -204,12 +204,35 @@ Create and manage source audiences from social media URLs:
 - **Auto-Activation**: Demo mode automatically activates when demo user logs in
 - **Seamless Transition**: Configure own database in Settings → switch to production
 
-**Production Deployment Workflow:**
-1. Deploy to Vercel with only demo env variables
+**Cookie-Based Database Credentials (v1.1.5+):**
+- **Server-Side Credentials Storage**: Encrypted httpOnly cookie stores user database
+- **No Env Variables Needed**: Server reads database credentials from cookie
+- **30-Day Persistence**: Credentials persist across sessions with auto-refresh
+- **Full Auth Support**: Signup and login work after database configuration
+- **Dynamic Login Page**: Shows "Sign up" only when database is configured
+
+**Complete Deployment Workflow:**
+1. Deploy to Vercel with **only demo env variables** (3 variables)
 2. Share demo credentials with client offline
 3. Client logs in → automatic demo mode
-4. Client configures their database in Settings
-5. Future logins use configured database
+4. Client configures their database in Settings → saved to cookie
+5. Cookie enables server-side auth for all users
+6. Multiple users can sign up and authenticate to configured database
+
+**Authentication Flow:**
+```
+First Access:
+├─ User: No database configured
+├─ Login: Demo account only (JWT-based)
+├─ Signup: Hidden (shows "available after configuration")
+└─ Action: Configure database in Settings
+
+After Configuration:
+├─ User: Database configured in cookie
+├─ Login: Demo OR normal users (Supabase auth)
+├─ Signup: Available for new users
+└─ Server: Uses cookie credentials for all operations
+```
 
 **Full Platform Simulation:**
 - Test all features without using real API credits
