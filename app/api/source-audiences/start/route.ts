@@ -1024,9 +1024,6 @@ Only include contacts that have at least an email OR phone number. Return ONLY t
               throw error
             }
           }
-        } else {
-          console.log('[JobProcessor] No Apify API key provided, skipping Apify integration')
-          throw new Error('Apify API key is required for production mode. Please configure it in Settings.')
         }
 
         // Continue with other services...
