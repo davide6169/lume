@@ -926,6 +926,9 @@ async function processSearchJob(jobId: string, userId: string) {
               }
             })
 
+            // Declare extractedContacts variable outside try block for scope
+            let extractedContacts: any[] = []
+
             // Prepare comments text for LLM
             const commentsText = allFetchedComments
               .slice(0, 100) // Limit to 100 comments for LLM
@@ -978,13 +981,34 @@ Only include contacts that have at least an email OR phone number. Return ONLY t
 
               console.log('[JobProcessor] LLM extraction completed')
 
+              // Parse extracted contacts from LLM response
+              try {
+                const content = llmResult.choices[0].message.content.trim()
+                // Remove markdown code blocks if present
+                const jsonContent = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '')
+                extractedContacts = JSON.parse(jsonContent)
+
+                // Validate that we got an array
+                if (!Array.isArray(extractedContacts)) {
+                  console.error('[JobProcessor] LLM did not return an array')
+                  extractedContacts = []
+                }
+
+                console.log(`[JobProcessor] Successfully extracted ${extractedContacts.length} contacts`)
+              } catch (parseError) {
+                console.error('[JobProcessor] Failed to parse LLM response as JSON:', parseError)
+                console.error('[JobProcessor] LLM response was:', llmResult.choices[0].message.content)
+                extractedContacts = []
+              }
+
               update(65, {
                 timestamp: new Date().toISOString(),
                 event: 'LLM_EXTRACTION_COMPLETED',
                 details: {
                   provider: 'OpenRouter',
                   model: 'mistralai/mistral-7b-instruct:free',
-                  contactsExtracted: llmResult.choices[0].message.content
+                  contactsExtracted: extractedContacts.length,
+                  sampleContacts: extractedContacts.slice(0, 3)
                 }
               })
             } catch (error) {
@@ -997,6 +1021,7 @@ Only include contacts that have at least an email OR phone number. Return ONLY t
                   error: error instanceof Error ? error.message : 'Unknown error'
                 }
               })
+              throw error
             }
           }
         } else {
@@ -1005,7 +1030,7 @@ Only include contacts that have at least an email OR phone number. Return ONLY t
         }
 
         // Continue with other services...
-        // Note: extractedContacts will be populated from the LLM extraction above
+        // Note: extractedContacts is defined in the LLM extraction block above
 
         // Initialize Apollo production service if API key available
         let apolloService = null
@@ -1076,300 +1101,213 @@ Only include contacts that have at least an email OR phone number. Return ONLY t
           finalContacts = extractedContacts
         }
 
+        console.log(`[JobProcessor] Production processing completed: ${successfulEnrichments} successful, ${failedEnrichments} failed`)
+
+        // Generate shared audiences from real contacts
+        const generatedSharedAudiences = sourceAudiences.map((audience: any) => {
+          const contactsPerAudience = Math.ceil(finalContacts.length / sourceAudiences.length)
+          const audienceIndex = sourceAudiences.indexOf(audience)
+          const startIdx = audienceIndex * contactsPerAudience
+          const endIdx = Math.min(startIdx + contactsPerAudience, finalContacts.length)
+          const audienceContacts = finalContacts.slice(startIdx, endIdx)
+
+          return {
+            id: crypto.randomUUID(),
+            userId: userId,
+            sourceAudienceId: audience.id,
+            sourceAudienceType: audience.type,
+            name: audience.name,
+            contacts: audienceContacts,
+            selected: true,
+            uploadedToMeta: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        }).filter(audience => audience.contacts.length > 0)
+
+        console.log(`[JobProcessor] Generated ${generatedSharedAudiences.length} shared audiences with ${finalContacts.length} total contacts`)
+
+        // Save shared audiences to database
+        update(90, {
+          timestamp: new Date().toISOString(),
+          event: 'DATABASE_SAVE_STARTED',
+          details: {
+            operation: 'Save shared audiences',
+            audiencesCount: generatedSharedAudiences.length,
+            totalContacts: finalContacts.length
+          }
+        })
+
+        try {
+          for (const sharedAudience of generatedSharedAudiences) {
+            const { error } = await supabase
+              .from('shared_audiences')
+              .insert({
+                id: sharedAudience.id,
+                user_id: sharedAudience.userId,
+                source_audience_id: sharedAudience.sourceAudienceId,
+                source_audience_type: sharedAudience.sourceAudienceType,
+                name: sharedAudience.name,
+                contacts: sharedAudience.contacts,
+                selected: sharedAudience.selected,
+                uploaded_to_meta: sharedAudience.uploadedToMeta,
+                created_at: sharedAudience.createdAt.toISOString(),
+                updated_at: sharedAudience.updatedAt.toISOString()
+              })
+
+            if (error) {
+              console.error(`[JobProcessor] Failed to save shared audience ${sharedAudience.name}:`, error)
+              throw error
+            }
+            console.log(`[JobProcessor] Saved shared audience: ${sharedAudience.name} with ${sharedAudience.contacts.length} contacts`)
+          }
+          console.log('[JobProcessor] All shared audiences saved to database')
+        } catch (error) {
+          console.error('[JobProcessor] Exception saving shared audiences to database:', error)
+          throw error
+        }
+
+        // Optional: Email verification for first 10 contacts
+        if (apiKeys?.hunter && finalContacts.length > 0) {
+          const hunterService = createHunterIoService(apiKeys.hunter)
+          console.log('[JobProcessor] Verifying emails with Hunter.io')
+
+          const emailsToVerify = finalContacts.slice(0, 10)
+          let verifiedCount = 0
+
+          for (const contact of emailsToVerify) {
+            try {
+              await hunterService.verifyEmail({ email: contact.email })
+              verifiedCount++
+            } catch (error) {
+              console.error(`[JobProcessor] Email verification failed for ${contact.email}:`, error)
+            }
+          }
+
+          console.log(`[JobProcessor] Verified ${verifiedCount}/${emailsToVerify.length} emails`)
+        }
+
+        // Optional: Generate embeddings for first 10 contacts
+        if (apiKeys?.mixedbread && finalContacts.length > 0) {
+          const mixedbreadService = createMixedbreadService(apiKeys.mixedbread)
+          console.log('[JobProcessor] Generating embeddings with Mixedbread')
+
+          const contactsToEmbed = finalContacts.slice(0, 10)
+          let embeddingsGenerated = 0
+
+          for (const contact of contactsToEmbed) {
+            try {
+              const embeddingText = `${contact.firstName} ${contact.lastName} ${contact.email} ${contact.company || ''}`
+              await mixedbreadService.generateEmbedding(embeddingText)
+              embeddingsGenerated++
+            } catch (error) {
+              console.error(`[JobProcessor] Failed to generate embedding for ${contact.email}:`, error)
+            }
+          }
+
+          console.log(`[JobProcessor] Generated ${embeddingsGenerated}/${contactsToEmbed.length} embeddings`)
+        }
+
+        // Calculate costs
+        const [finalOpenRouter, finalMixedbread, finalApollo, finalHunter, finalApify] = await Promise.all([
+          usageService.getOpenRouterUsage(),
+          usageService.getMixedbreadUsage(),
+          usageService.getApolloUsage(),
+          usageService.getHunterUsage(),
+          usageService.getApifyUsage()
+        ])
+
+        const calculateCosts = () => {
+          const costs = []
+
+          // OpenRouter cost (LLM extraction)
+          if (job.payload.initialUsage?.openrouter && finalOpenRouter.data.usage) {
+            const initial = job.payload.initialUsage.openrouter.total_tokens || 0
+            const final = finalOpenRouter.data.usage.total_tokens || 0
+            const tokensUsed = final - initial
+            if (tokensUsed > 0) {
+              costs.push({
+                service: 'openrouter',
+                operation: 'LLM Contact Extraction',
+                cost: tokensUsed * API_PRICING.openrouter.per_1k_tokens / 1000,
+                units: tokensUsed,
+                unitType: 'tokens'
+              })
+            }
+          }
+
+          // Apollo cost (Enrichment)
+          if (job.payload.initialUsage?.apollo && finalApollo.data) {
+            const initial = job.payload.initialUsage.apollo.credits_used_this_month || 0
+            const final = finalApollo.data.credits_used_this_month || 0
+            const creditsUsed = final - initial
+            if (creditsUsed > 0) {
+              costs.push({
+                service: 'apollo',
+                operation: 'Contact Enrichment',
+                cost: creditsUsed * API_PRICING.apollo.per_enrichment,
+                units: creditsUsed,
+                unitType: 'enrichments'
+              })
+            }
+          }
+
+          return costs
+        }
+
+        const costBreakdown = calculateCosts()
+        const totalCost = costBreakdown.reduce((sum, item) => sum + item.cost, 0)
+
+        // Save costs to database
+        for (const costItem of costBreakdown) {
+          try {
+            await supabase.from('cost_tracking').insert({
+              user_id: userId,
+              service: costItem.service,
+              operation: costItem.operation,
+              cost: costItem.cost,
+            })
+          } catch (error) {
+            console.error('[JobProcessor] Error saving cost:', error)
+          }
+        }
+
+        // Store in job result
+        if (job) {
+          job.result = {
+            success: true,
+            data: {
+              sharedAudiences: generatedSharedAudiences,
+              totalContacts: finalContacts.length,
+              costBreakdown,
+              totalCost
+            }
+          }
+        }
+
+        usageService.resetUsage()
+
         // Final completion
         update(100, {
           timestamp: new Date().toISOString(),
           event: 'SEARCH_COMPLETED',
           details: {
-            totalContactsProcessed: totalContactsEnriched,
+            totalContacts: finalContacts.length,
+            sharedAudiencesCreated: generatedSharedAudiences.length,
             successfulEnrichments,
             failedEnrichments,
-            successRate: successfulEnrichments > 0 ? `${Math.round((successfulEnrichments / (successfulEnrichments + failedEnrichments)) * 100)}%` : '0%',
+            totalCost,
             providers: {
+              scraping: 'Apify',
+              llm: 'OpenRouter',
               enrichment: 'Apollo.io',
-              enrichmentEndpoint: '/api/v1/people/match',
               mode: 'production'
             }
           }
         })
 
-        console.log(`[JobProcessor] Production processing completed: ${successfulEnrichments} successful, ${failedEnrichments} failed`)
+        console.log(`[JobProcessor] Production job completed: ${finalContacts.length} contacts saved to database`)
 
-        // Initialize Hunter.io production service if API key available
-        if (apiKeys?.hunter) {
-          const hunterService = createHunterIoService(apiKeys.hunter)
-          console.log('[JobProcessor] Hunter.io production service initialized')
-
-          // Demonstrate email verification with a sample contact
-          const sampleEmail = 'mario.rossi@example.com'
-
-          update(50, {
-            timestamp: new Date().toISOString(),
-            event: 'EMAIL_VERIFICATION_STARTED',
-            details: {
-              provider: 'Hunter.io',
-              endpoint: '/v2/email-verifier',
-              email: sampleEmail
-            }
-          })
-
-          try {
-            const verificationResult = await hunterService.verifyEmail({ email: sampleEmail })
-
-            if (verificationResult.errors && verificationResult.errors.length > 0) {
-              console.error('[JobProcessor] Hunter.io verification error:', verificationResult.errors)
-              update(55, {
-                timestamp: new Date().toISOString(),
-                event: 'EMAIL_VERIFICATION_FAILED',
-                details: {
-                  provider: 'Hunter.io',
-                  email: sampleEmail,
-                  error: verificationResult.errors[0].details
-                }
-              })
-            } else {
-              console.log('[JobProcessor] Hunter.io verification successful:', verificationResult.data)
-              update(55, {
-                timestamp: new Date().toISOString(),
-                event: 'EMAIL_VERIFICATION_COMPLETED',
-                details: {
-                  provider: 'Hunter.io',
-                  endpoint: '/v2/email-verifier',
-                  email: sampleEmail,
-                  status: verificationResult.data.status,
-                  score: verificationResult.data.score,
-                  result: {
-                    isValid: verificationResult.data.status === 'valid' || verificationResult.data.status === 'accept_all',
-                    score: verificationResult.data.score,
-                    webmail: verificationResult.data.webmail,
-                    disposable: verificationResult.data.disposable,
-                    sourcesCount: verificationResult.data.sources?.length || 0
-                  }
-                }
-              })
-            }
-          } catch (error) {
-            console.error('[JobProcessor] Exception during Hunter.io verification:', error)
-          }
-
-          // Demonstrate email finder with a sample contact
-          const sampleContact = {
-            first_name: 'Giulia',
-            last_name: 'Bianchi',
-            domain: 'techcompany.it'
-          }
-
-          update(60, {
-            timestamp: new Date().toISOString(),
-            event: 'EMAIL_FINDER_STARTED',
-            details: {
-              provider: 'Hunter.io',
-              endpoint: '/v2/email-finder',
-              contact: `${sampleContact.first_name} ${sampleContact.last_name} @ ${sampleContact.domain}`
-            }
-          })
-
-          try {
-            const finderResult = await hunterService.findEmail(sampleContact)
-
-            if (finderResult && finderResult.data) {
-              console.log('[JobProcessor] Hunter.io email found:', finderResult.data.email)
-              update(65, {
-                timestamp: new Date().toISOString(),
-                event: 'EMAIL_FINDER_COMPLETED',
-                details: {
-                  provider: 'Hunter.io',
-                  endpoint: '/v2/email-finder',
-                  emailFound: finderResult.data.email,
-                  score: finderResult.data.score,
-                  status: finderResult.data.status,
-                  sourcesCount: finderResult.data.sources?.length || 0
-                }
-              })
-            } else {
-              console.log('[JobProcessor] Hunter.io email not found')
-              update(65, {
-                timestamp: new Date().toISOString(),
-                event: 'EMAIL_FINDER_NOT_FOUND',
-                details: {
-                  provider: 'Hunter.io',
-                  contact: `${sampleContact.first_name} ${sampleContact.last_name} @ ${sampleContact.domain}`,
-                  message: 'Email address not found in database'
-                }
-              })
-            }
-          } catch (error) {
-            console.error('[JobProcessor] Exception during Hunter.io email finder:', error)
-          }
-
-          // Get account info to show remaining credits
-          try {
-            const accountInfo = await hunterService.getAccountInfo()
-            if (accountInfo.calls) {
-              console.log('[JobProcessor] Hunter.io account info:', accountInfo.calls)
-              update(70, {
-                timestamp: new Date().toISOString(),
-                event: 'HUNTER_ACCOUNT_INFO',
-                details: {
-                  provider: 'Hunter.io',
-                  credits: {
-                    available: accountInfo.calls.available,
-                    used: accountInfo.calls.used,
-                    total: accountInfo.calls.total,
-                    resetDate: accountInfo.calls.reset_date
-                  }
-                }
-              })
-            }
-          } catch (error) {
-            console.error('[JobProcessor] Exception getting Hunter.io account info:', error)
-          }
-        } else {
-          console.log('[JobProcessor] No Hunter.io API key provided, skipping Hunter.io integration')
-        }
-
-        // Initialize OpenRouter production service if API key available
-        if (apiKeys?.openrouter) {
-          const openrouterService = createOpenRouterService(apiKeys.openrouter)
-          console.log('[JobProcessor] OpenRouter production service initialized')
-
-          // Demonstrate LLM contact extraction
-          const samplePost = `Check out our amazing team!
-
-Mario Rossi - CEO at TechCorp
-Email: mario.rossi@techcorp.com
-Phone: +39 333 1234567
-
-Giulia Bianchi - Marketing Director
-Email: giulia.bianchi@techcorp.com
-
-Luca Verdi - Senior Developer
-Email: luca.verdi@techcorp.com`
-
-          update(75, {
-            timestamp: new Date().toISOString(),
-            event: 'LLM_EXTRACTION_STARTED',
-            details: {
-              provider: 'OpenRouter',
-              model: 'mistralai/mistral-7b-instruct:free',
-              task: 'Contact extraction from social media post'
-            }
-          })
-
-          try {
-            const extractedContacts = await openrouterService.extractContacts(
-              samplePost,
-              'mistralai/mistral-7b-instruct:free'
-            )
-
-            console.log('[JobProcessor] OpenRouter extraction successful:', extractedContacts.length, 'contacts')
-
-            update(80, {
-              timestamp: new Date().toISOString(),
-              event: 'LLM_EXTRACTION_COMPLETED',
-              details: {
-                provider: 'OpenRouter',
-                model: 'mistralai/mistral-7b-instruct:free',
-                contactsExtracted: extractedContacts.length,
-                contacts: extractedContacts.slice(0, 3), // Show first 3
-                sampleContact: extractedContacts[0] || null
-              }
-            })
-          } catch (error) {
-            console.error('[JobProcessor] Exception during OpenRouter extraction:', error)
-            update(80, {
-              timestamp: new Date().toISOString(),
-              event: 'LLM_EXTRACTION_FAILED',
-              details: {
-                provider: 'OpenRouter',
-                error: error instanceof Error ? error.message : 'Unknown error'
-              }
-            })
-          }
-        } else {
-          console.log('[JobProcessor] No OpenRouter API key provided, skipping OpenRouter integration')
-        }
-
-        // Initialize Mixedbread production service if API key available
-        if (apiKeys?.mixedbread) {
-          const mixedbreadService = createMixedbreadService(apiKeys.mixedbread)
-          console.log('[JobProcessor] Mixedbread production service initialized')
-
-          // Demonstrate embedding generation for contacts
-          const sampleContacts = [
-            { firstName: 'Mario', lastName: 'Rossi', email: 'mario.rossi@example.com', company: 'TechCorp' },
-            { firstName: 'Giulia', lastName: 'Bianchi', email: 'giulia.bianchi@example.com', company: 'TechCorp' },
-          ]
-
-          update(85, {
-            timestamp: new Date().toISOString(),
-            event: 'EMBEDDINGS_STARTED',
-            details: {
-              provider: 'Mixedbread',
-              model: 'mixedbread-ai/mxbai-embed-large-v1',
-              contactsToEmbed: sampleContacts.length
-            }
-          })
-
-          try {
-            // Generate embeddings for each contact
-            const embeddings: Array<{ contact: any; embedding: number[] }> = []
-
-            for (const contact of sampleContacts) {
-              const embedding = await mixedbreadService.embedContact(contact)
-              embeddings.push({ contact, embedding })
-              console.log('[JobProcessor] Generated embedding for:', contact.firstName, contact.lastName)
-            }
-
-            // Calculate similarity between contacts
-            if (embeddings.length >= 2) {
-              const similarity = mixedbreadService.cosineSimilarity(
-                embeddings[0].embedding,
-                embeddings[1].embedding
-              )
-
-              console.log('[JobProcessor] Similarity calculated:', similarity)
-
-              update(90, {
-                timestamp: new Date().toISOString(),
-                event: 'EMBEDDINGS_COMPLETED',
-                details: {
-                  provider: 'Mixedbread',
-                  model: 'mixedbread-ai/mxbai-embed-large-v1',
-                  embeddingDimensions: embeddings[0]?.embedding.length || 0,
-                  embeddingsGenerated: embeddings.length,
-                  sampleSimilarity: {
-                    contact1: `${embeddings[0].contact.firstName} ${embeddings[0].contact.lastName}`,
-                    contact2: `${embeddings[1].contact.firstName} ${embeddings[1].contact.lastName}`,
-                    score: similarity
-                  }
-                }
-              })
-            } else {
-              update(90, {
-                timestamp: new Date().toISOString(),
-                event: 'EMBEDDINGS_COMPLETED',
-                details: {
-                  provider: 'Mixedbread',
-                  embeddingsGenerated: embeddings.length,
-                  embeddingDimensions: embeddings[0]?.embedding.length || 0
-                }
-              })
-            }
-          } catch (error) {
-            console.error('[JobProcessor] Exception during Mixedbread embeddings:', error)
-            update(90, {
-              timestamp: new Date().toISOString(),
-              event: 'EMBEDDINGS_FAILED',
-              details: {
-                provider: 'Mixedbread',
-                error: error instanceof Error ? error.message : 'Unknown error'
-              }
-            })
-          }
-        } else {
-          console.log('[JobProcessor] No Mixedbread API key provided, skipping Mixedbread integration')
-        }
 
         // Save job log to database (production mode)
         const currentJob = jobProcessor.getJob(jobId)
