@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -25,8 +25,15 @@ interface CreateSourceAudienceDialogProps {
 export function CreateSourceAudienceDialog({ onCreate }: CreateSourceAudienceDialogProps) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
-  const [type, setType] = useState<'facebook' | 'instagram' | null>(null)
+  const [type, setType] = useState<'facebook' | 'instagram'>('facebook')
   const [urls, setUrls] = useState('')
+
+  // Initialize name with suggested value when dialog opens
+  useEffect(() => {
+    if (open && !name) {
+      setName(getSuggestedName(type))
+    }
+  }, [open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,24 +60,24 @@ export function CreateSourceAudienceDialog({ onCreate }: CreateSourceAudienceDia
 
     // Reset form
     setName('')
-    setType(null)
+    setType('facebook')
     setUrls('')
     setOpen(false)
   }
 
-  const getSuggestedName = () => {
-    if (type === 'facebook') {
-      return 'Facebook Audience ' + new Date().toLocaleDateString()
+  const getSuggestedName = (platformType: 'facebook' | 'instagram' = type) => {
+    const now = new Date()
+    const date = now.toLocaleDateString()
+    const time = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+
+    if (platformType === 'facebook') {
+      return `Facebook Audience ${date} ${time}`
     }
-    if (type === 'instagram') {
-      return 'Instagram Audience ' + new Date().toLocaleDateString()
+    if (platformType === 'instagram') {
+      return `Instagram Audience ${date} ${time}`
     }
     return ''
   }
-
-  const selectedTypeStyle = type
-    ? 'border-2 border-primary bg-primary/5'
-    : 'border-2 border-transparent hover:border-primary/50'
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -98,10 +105,15 @@ export function CreateSourceAudienceDialog({ onCreate }: CreateSourceAudienceDia
                 <button
                   type="button"
                   onClick={() => {
+                    // Update suggested name if current name is empty or matches the previous suggestion
+                    if (!name || name.startsWith('Instagram Audience ')) {
+                      setName(getSuggestedName('facebook'))
+                    }
                     setType('facebook')
-                    if (!name) setName(getSuggestedName())
                   }}
-                  className={`flex flex-col items-center gap-2 p-6 rounded-lg border-2 transition-all ${selectedTypeStyle}`}
+                  className={`flex flex-col items-center gap-2 p-6 rounded-lg border-2 transition-all ${
+                    type === 'facebook' ? 'border-primary bg-primary/5' : 'border-transparent hover:border-primary/50'
+                  }`}
                 >
                   <Facebook className="h-12 w-12" />
                   <span className="font-medium">Facebook</span>
@@ -109,11 +121,14 @@ export function CreateSourceAudienceDialog({ onCreate }: CreateSourceAudienceDia
                 <button
                   type="button"
                   onClick={() => {
+                    // Update suggested name if current name is empty or matches the previous suggestion
+                    if (!name || name.startsWith('Facebook Audience ')) {
+                      setName(getSuggestedName('instagram'))
+                    }
                     setType('instagram')
-                    if (!name) setName(getSuggestedName())
                   }}
                   className={`flex flex-col items-center gap-2 p-6 rounded-lg border-2 transition-all ${
-                    type === 'instagram' ? 'border-2 border-primary bg-primary/5' : 'border-2 border-transparent hover:border-primary/50'
+                    type === 'instagram' ? 'border-primary bg-primary/5' : 'border-transparent hover:border-primary/50'
                   }`}
                 >
                   <Instagram className="h-12 w-12" />
@@ -127,13 +142,13 @@ export function CreateSourceAudienceDialog({ onCreate }: CreateSourceAudienceDia
               <Label htmlFor="name">Audience Name *</Label>
               <Input
                 id="name"
-                placeholder="My Facebook Audience"
+                placeholder="My Audience"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
               <p className="text-xs text-muted-foreground">
-                A descriptive name for this audience source
+                A descriptive name for this audience source (auto-generated with timestamp)
               </p>
             </div>
 

@@ -1929,6 +1929,32 @@ Proprietary - All rights reserved
 3. No server-side credential management needed
 4. Each deployment completely isolated from others
 
+**Update (January 8, 2026) - Create Source Audience Dialog Improvements:**
+- **Platform Type Selection**: Fixed mutual exclusive selection between Facebook and Instagram
+  - Facebook now pre-selected by default
+  - Only one platform can be selected at a time
+  - Proper visual feedback for selected platform
+- **Auto-Generated Audience Names**: Audience names now include timestamp for uniqueness
+  - Format: "Facebook Audience DD/MM/YYYY HH:MM:SS" or "Instagram Audience DD/MM/YYYY HH:MM:SS"
+  - Time uses 24-hour format with Italian locale
+  - Ensures each audience has a unique name
+- **Real-time Name Updates**: Name automatically updates when switching platforms
+  - Changes from Facebook to Instagram update suggested name immediately
+  - Changes from Instagram to Facebook update suggested name immediately
+  - Preserves custom names if user manually edits the field
+- **Auto-Initialization**: Dialog pre-fills audience name on opening
+  - Name field automatically populated with suggested name when dialog opens
+  - Placeholder updated to be more generic ("My Audience")
+  - Better UX with less manual typing required
+
+**Bug Fixes:**
+- Fixed both platforms appearing selected simultaneously
+- Fixed suggested name not updating when switching platform types
+- Fixed empty name field on dialog open
+
+**Updated Files:**
+- `components/source-audiences/CreateSourceAudienceDialog.tsx`: Platform selection and name generation improvements
+
 ### Version 1.1.4 (January 2026) - Production Demo Authentication 🔐
 - **JWT-based Demo Authentication**: Implemented secure demo account system for production deployments
   - Hardcoded JWT secret committed to GitHub for demo access
