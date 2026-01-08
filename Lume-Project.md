@@ -28,7 +28,7 @@ A complete multi-tenant SaaS platform for extracting, enriching, and managing co
 - Build custom audiences for Meta advertising campaigns
 - Track and manage all associated costs automatically
 
-**Current Version:** v1.3.1
+**Current Version:** v1.4.0
 **Last Updated:** January 2026
 **License:** Proprietary
 
@@ -195,6 +195,21 @@ Create and manage source audiences from social media URLs:
 ---
 
 ### 7. Demo Mode
+
+**Production Demo Access (v1.1.4+):**
+- **JWT-based Demo Authentication**: Secure demo account for first-time access
+- **Zero-Configuration Deployment**: Deploy on Vercel without database env variables
+- **Dedicated Client Deployments**: Share demo credentials offline with clients
+- **Demo Credentials**: `demo@lume.app` / `Lume#Secure$2026!Pr0d@Acc3ss`
+- **Auto-Activation**: Demo mode automatically activates when demo user logs in
+- **Seamless Transition**: Configure own database in Settings → switch to production
+
+**Production Deployment Workflow:**
+1. Deploy to Vercel with only demo env variables
+2. Share demo credentials with client offline
+3. Client logs in → automatic demo mode
+4. Client configures their database in Settings
+5. Future logins use configured database
 
 **Full Platform Simulation:**
 - Test all features without using real API credits

@@ -1875,6 +1875,57 @@ Proprietary - All rights reserved
 
 ## Changelog
 
+### Version 1.1.4 (January 2026) - Production Demo Authentication 🔐
+- **JWT-based Demo Authentication**: Implemented secure demo account system for production deployments
+  - Hardcoded JWT secret committed to GitHub for demo access
+  - Demo credentials: `demo@lume.app` / `Lume#Secure$2026!Pr0d@Acc3ss`
+  - Token expires in 7 days with automatic refresh
+  - Uses `jose` library for industry-standard JWT signing/verification
+- **Zero-Configuration Vercel Deployment**: Deploy on Vercel without ANY database environment variables
+  - Auth pages always visible regardless of Supabase configuration
+  - System determines auth type (demo vs Supabase) based on credentials
+  - Perfect for dedicated client deployments with offline credential sharing
+- **Enhanced Security**:
+  - httpOnly cookies prevent XSS attacks
+  - JWT validation happens server-side in middleware
+  - Demo users bypass database authentication completely
+  - Strong, non-guessable password for demo account
+- **Auto Demo Mode Detection**: Demo mode automatically activates when demo user is detected
+  - Client-side hook checks `/api/user/demo` endpoint
+  - Forces demo mode ON for demo users regardless of settings
+  - Seamless transition to production mode after database configuration
+
+**Deployment Workflow**:
+1. Deploy to Vercel with only 3 demo env variables configured
+2. Share demo credentials with client offline
+3. Client logs in with demo account → automatic demo mode
+4. Client configures their own database in Settings → production mode
+5. Future logins use configured database
+
+**Updated Files**:
+- `lib/auth/demo-auth.ts`: Demo JWT generation and validation utilities
+- `app/auth/actions.ts`: Login action with demo credential detection
+- `middleware.ts`: JWT validation before Supabase auth
+- `app/api/user/demo/route.ts`: API endpoint to check demo user status
+- `lib/hooks/use-demo-mode-detection.ts`: Auto demo mode activation
+- `app/(auth)/login/page.tsx`: Removed env variable checks
+- `app/(auth)/signup/page.tsx`: Removed env variable checks
+- `.env.local.example`: Added demo credentials documentation
+- `package.json`: Added `jose` dependency
+
+**Environment Variables**:
+```bash
+NEXT_PUBLIC_DEMO_EMAIL=demo@lume.app
+NEXT_PUBLIC_DEMO_PASSWORD=Lume#Secure$2026!Pr0d@Acc3ss
+DEMO_JWT_SECRET=lume-demo-jwt-secret-commit-for-production-2026
+```
+
+**Security Notes**:
+- Demo credentials are visible in GitHub (intended for trusted client deployments)
+- JWT secret is committed (only used for demo mode, not production data)
+- httpOnly cookies prevent client-side token access
+- Demo users cannot access real database without proper configuration
+
 ### Version 1.1.3 (January 2026) - UI/UX Improvements 🎨
 - **Navigation Enhancement**: Added "Settings" to main navigation menu (before "Docs")
 - **Terminology Update**: Renamed "Scraping Limits" to "Source Data Limits" to avoid controversial terms

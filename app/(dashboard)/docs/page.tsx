@@ -287,6 +287,32 @@ export default function DocsPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="p-4 border rounded-lg bg-purple-50 dark:bg-purple-950">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-5 w-5 text-purple-600" />
+                  <h4 className="font-semibold">Production Demo Access (v1.1.4+)</h4>
+                  <Badge>Zero-Config Deployment</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    Deploy Lume on Vercel without any database configuration using the demo authentication system:
+                  </p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• <strong>JWT-based Demo Auth</strong> - Secure demo account with hardcoded JWT secret</li>
+                    <li>• <strong>No Database Required</strong> - Deploy with only 3 demo environment variables</li>
+                    <li>• <strong>Dedicated Deployments</strong> - Share demo credentials offline with your clients</li>
+                    <li>• <strong>Auto Demo Mode</strong> - Demo mode activates automatically when demo user logs in</li>
+                    <li>• <strong>Seamless Transition</strong> - Client configures their own database to switch to production</li>
+                  </ul>
+                  <div className="mt-3 p-2 bg-purple-100 dark:bg-purple-900 rounded text-xs">
+                    <strong>Deployment Workflow:</strong> Configure 3 demo env variables on Vercel → Share demo credentials with client → Client logs in → Auto demo mode → Client configures database → Production mode
+                  </div>
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">
+                    🔐 Perfect for client deployments where each client gets their own dedicated instance with offline credential sharing.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
