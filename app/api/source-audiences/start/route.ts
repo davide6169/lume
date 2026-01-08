@@ -898,11 +898,25 @@ async function processSearchJob(jobId: string, userId: string) {
 
           console.log(`[JobProcessor] Total comments fetched: ${allFetchedComments.length}`)
 
-          // Extract contacts from comments using LLM
-          if (openrouterService && allFetchedComments.length > 0) {
-            console.log('[JobProcessor] Starting LLM extraction from comments')
+          // Validate that we successfully fetched comments
+          if (allFetchedComments.length === 0) {
+            console.error('[JobProcessor] No comments fetched from any URL in production mode')
+            throw new Error('No comments were fetched from the Source Audience URLs. Please verify:\n' +
+              '1. The URLs are correct and publicly accessible\n' +
+              '2. The posts have comments (not all posts do)\n' +
+              '3. The accounts are public (not private)\n' +
+              'Try with a more active account like https://www.instagram.com/garyvee')
+          }
 
-            update(55, {
+          // Extract contacts from comments using LLM
+          if (!openrouterService) {
+            console.error('[JobProcessor] No OpenRouter API key provided for LLM extraction')
+            throw new Error('OpenRouter API key is required for production mode. Please configure it in Settings.')
+          }
+
+          console.log('[JobProcessor] Starting LLM extraction from comments')
+
+          update(55, {
               timestamp: new Date().toISOString(),
               event: 'LLM_EXTRACTION_STARTED',
               details: {
@@ -991,119 +1005,75 @@ Only include contacts that have at least an email OR phone number. Return ONLY t
         }
 
         // Continue with other services...
+        // Note: extractedContacts will be populated from the LLM extraction above
 
-        if (!apiKeys || !apiKeys.apollo) {
-          console.error('[JobProcessor] Missing Apollo API key for production mode')
-          throw new Error('Apollo API key is required for production mode')
+        // Initialize Apollo production service if API key available
+        let apolloService = null
+        if (apiKeys?.apollo) {
+          apolloService = createApolloEnrichmentService(apiKeys.apollo)
+          console.log('[JobProcessor] Apollo production service initialized')
         }
 
-        // Initialize Apollo production service
-        const apolloService = createApolloEnrichmentService(apiKeys.apollo)
-        console.log('[JobProcessor] Apollo production service initialized')
-
-        // Track total contacts enriched
+        // Track enrichment stats
         let totalContactsEnriched = 0
         let successfulEnrichments = 0
         let failedEnrichments = 0
 
-        // Process each audience
-        for (let i = 0; i < sourceAudiences.length; i++) {
-          const audience: any = sourceAudiences[i]
-          const audienceProgress = 10 + ((i + 1) / totalAudiences) * 80
+        // Store contacts that will be enriched and saved to database
+        let finalContacts: any[] = []
 
-          update(audienceProgress - 5, {
+        // Enrich extracted contacts using Apollo if available (optional step)
+        if (apolloService && extractedContacts.length > 0) {
+          console.log(`[JobProcessor] Enriching ${extractedContacts.length} extracted contacts with Apollo`)
+
+          update(85, {
             timestamp: new Date().toISOString(),
-            event: 'AUDIENCE_PROCESSING_STARTED',
+            event: 'APOLLO_ENRICHMENT_STARTED',
             details: {
-              audienceName: audience.name,
-              audienceId: audience.id,
-              urlCount: audience.urls.length,
-              platform: audience.type
+              provider: 'Apollo.io',
+              totalContacts: extractedContacts.length
             }
           })
 
-          // Simulate some contacts to enrich (in real implementation, these would come from Meta GraphAPI + LLM extraction)
-          const sampleContacts = [
-            { firstName: 'Mario', lastName: 'Rossi', email: 'mario.rossi@example.com' },
-            { firstName: 'Lucia', lastName: 'Bianchi', email: 'lucia.bianchi@techcompany.it' },
-            { firstName: 'Marco', lastName: 'Verdi', email: 'marco.verdi@startup.com' }
-          ]
-
-          console.log(`[JobProcessor] Enriching ${sampleContacts.length} contacts for audience ${audience.name}`)
-
-          // Enrich contacts using Apollo production API
-          for (let j = 0; j < sampleContacts.length; j++) {
-            const contact = sampleContacts[j]
-            const contactProgress = audienceProgress - 4 + (j / sampleContacts.length) * 4
-
-            update(contactProgress, {
-              timestamp: new Date().toISOString(),
-              event: 'APOLLO_ENRICHMENT_STARTED',
-              details: {
-                provider: 'Apollo.io',
-                endpoint: '/api/v1/people/match',
-                contactEmail: contact.email,
-                contactIndex: j + 1
-              }
-            })
+          for (let i = 0; i < extractedContacts.length; i++) {
+            const contact = extractedContacts[i]
 
             try {
-              // Call real Apollo API
               const enrichmentRequest = apolloService.contactToEnrichmentRequest(contact)
               const result = await apolloService.enrichPerson(enrichmentRequest)
 
               if (result.error) {
                 console.error(`[JobProcessor] Apollo enrichment failed for ${contact.email}:`, result.error)
                 failedEnrichments++
-                update(contactProgress, {
-                  timestamp: new Date().toISOString(),
-                  event: 'APOLLO_ENRICHMENT_FAILED',
-                  details: {
-                    provider: 'Apollo.io',
-                    contactEmail: contact.email,
-                    error: result.error
-                  }
-                })
+                // Keep original contact even if enrichment fails
+                finalContacts.push(contact)
               } else if (result.person) {
                 console.log(`[JobProcessor] Apollo enrichment successful for ${contact.email}`)
+                // Merge original contact with enriched data
+                const enrichedContact = {
+                  ...contact,
+                  title: result.person.title,
+                  company: result.person.employment_history?.[0]?.organization_name,
+                  linkedin_url: result.person.linkedin_url,
+                  phone: result.person.contact?.phone_numbers?.[0]?.number || contact.phone
+                }
+                finalContacts.push(enrichedContact)
                 successfulEnrichments++
                 totalContactsEnriched++
-
-                update(contactProgress, {
-                  timestamp: new Date().toISOString(),
-                  event: 'APOLLO_ENRICHMENT_COMPLETED',
-                  details: {
-                    provider: 'Apollo.io',
-                    endpoint: '/api/v1/people/match',
-                    contactEmail: contact.email,
-                    enrichedData: {
-                      firstName: result.person.first_name,
-                      lastName: result.person.last_name,
-                      title: result.person.title,
-                      company: result.person.employment_history?.[0]?.organization_name,
-                      linkedinUrl: result.person.linkedin_url,
-                      phoneFound: !!result.person.contact?.phone_numbers?.length
-                    }
-                  }
-                })
               }
             } catch (error) {
               console.error(`[JobProcessor] Exception during Apollo enrichment for ${contact.email}:`, error)
               failedEnrichments++
+              // Keep original contact even if enrichment fails
+              finalContacts.push(contact)
             }
           }
 
-          // Complete audience processing
-          update(audienceProgress, {
-            timestamp: new Date().toISOString(),
-            event: 'AUDIENCE_PROCESSING_COMPLETED',
-            details: {
-              audienceName: audience.name,
-              contactsProcessed: sampleContacts.length,
-              successfulEnrichments,
-              failedEnrichments
-            }
-          })
+          console.log(`[JobProcessor] Apollo enrichment completed: ${successfulEnrichments} successful, ${failedEnrichments} failed`)
+        } else {
+          // No Apollo API key, use extracted contacts as-is
+          console.log('[JobProcessor] No Apollo API key, using extracted contacts without enrichment')
+          finalContacts = extractedContacts
         }
 
         // Final completion

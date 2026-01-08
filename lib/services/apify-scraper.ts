@@ -175,6 +175,19 @@ export class ApifyScraperService {
     url: string,
     options: FetchOptions
   ): Promise<ApifyRunResponse> {
+    const requestBody = {
+      directUrls: [url],
+      resultsType: 'comments',
+      maxItems: options.limit || 100,
+      addParentData: false,
+    }
+
+    console.log('[Apify] Starting Instagram scraper with request:', {
+      url: `${this.baseUrl}/acts/apify~instagram-scraper/runs`,
+      method: 'POST',
+      body: requestBody,
+    })
+
     const response = await fetch(
       `${this.baseUrl}/acts/apify~instagram-scraper/runs`,
       {
@@ -183,21 +196,24 @@ export class ApifyScraperService {
           'Authorization': `Bearer ${this.apiToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          directUrls: [url],
-          resultsType: 'comments',
-          maxItems: options.limit || 100,
-          addParentData: false,
-        }),
+        body: JSON.stringify(requestBody),
       }
     )
 
+    const responseData = await response.json()
+
+    console.log('[Apify] Instagram scraper response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      data: responseData,
+    })
+
     if (!response.ok) {
-      const error = await response.json()
-      throw error
+      throw responseData
     }
 
-    return response.json()
+    return responseData
   }
 
   // ============================================
@@ -253,6 +269,20 @@ export class ApifyScraperService {
     url: string,
     options: FetchOptions
   ): Promise<ApifyRunResponse> {
+    const requestBody = {
+      startUrls: [{ url }],
+      resultsType: 'posts',
+      maxItems: options.limit || 100,
+      includeComments: true,
+      maxComments: 100,
+    }
+
+    console.log('[Apify] Starting Facebook scraper with request:', {
+      url: `${this.baseUrl}/acts/apify~facebook-posts-scraper/runs`,
+      method: 'POST',
+      body: requestBody,
+    })
+
     const response = await fetch(
       `${this.baseUrl}/acts/apify~facebook-posts-scraper/runs`,
       {
@@ -261,22 +291,24 @@ export class ApifyScraperService {
           'Authorization': `Bearer ${this.apiToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          startUrls: [{ url }],
-          resultsType: 'posts',
-          maxItems: options.limit || 100,
-          includeComments: true,
-          maxComments: 100,
-        }),
+        body: JSON.stringify(requestBody),
       }
     )
 
+    const responseData = await response.json()
+
+    console.log('[Apify] Facebook scraper response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      data: responseData,
+    })
+
     if (!response.ok) {
-      const error = await response.json()
-      throw error
+      throw responseData
     }
 
-    return response.json()
+    return responseData
   }
 
   // ============================================
@@ -326,24 +358,55 @@ export class ApifyScraperService {
     const startTime = Date.now()
     const pollInterval = 2000 // Check every 2 seconds
 
+    console.log('[Apify] Waiting for run to complete:', {
+      runId,
+      actorId,
+      maxWaitTime: `${maxWaitTime}ms`,
+    })
+
     while (Date.now() - startTime < maxWaitTime) {
-      const response = await fetch(`${this.baseUrl}/acts/${actorId}/runs/${runId}`, {
+      const statusUrl = `${this.baseUrl}/acts/${actorId}/runs/${runId}`
+
+      const response = await fetch(statusUrl, {
         headers: {
           'Authorization': `Bearer ${this.apiToken}`,
         },
       })
 
       if (!response.ok) {
+        console.error('[Apify] Failed to check run status:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: statusUrl,
+        })
         throw new Error(`Failed to check run status: ${response.statusText}`)
       }
 
       const run: ApifyRunResponse = await response.json()
 
+      console.log('[Apify] Run status update:', {
+        runId,
+        status: run.status,
+        datasetId: run.datasetId,
+      })
+
       if (run.status === 'SUCCEEDED') {
+        console.log('[Apify] Run completed successfully:', {
+          runId,
+          datasetId: run.datasetId,
+          startedAt: run.startedAt,
+          finishedAt: run.finishedAt,
+        })
         return
       }
 
       if (run.status === 'FAILED' || run.status === 'TIMED-OUT' || run.status === 'ABORTED') {
+        console.error('[Apify] Run failed:', {
+          runId,
+          status: run.status,
+          startedAt: run.startedAt,
+          finishedAt: run.finishedAt,
+        })
         throw new Error(`Apify run ${run.status.toLowerCase()}`)
       }
 
@@ -362,21 +425,38 @@ export class ApifyScraperService {
     let offset = 0
     const limit = 100
 
+    console.log('[Apify] Fetching dataset items:', {
+      datasetId,
+      limit,
+    })
+
     while (true) {
-      const response = await fetch(
-        `${this.baseUrl}/datasets/${datasetId}/items?limit=${limit}&offset=${offset}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
-          },
-        }
-      )
+      const datasetUrl = `${this.baseUrl}/datasets/${datasetId}/items?limit=${limit}&offset=${offset}`
+
+      const response = await fetch(datasetUrl, {
+        headers: {
+          'Authorization': `Bearer ${this.apiToken}`,
+        },
+      })
 
       if (!response.ok) {
+        console.error('[Apify] Failed to fetch dataset:', {
+          datasetId,
+          status: response.status,
+          statusText: response.statusText,
+          url: datasetUrl,
+        })
         throw new Error(`Failed to fetch dataset: ${response.statusText}`)
       }
 
       const batch: ApifyDatasetItem[] = await response.json()
+
+      console.log('[Apify] Dataset batch received:', {
+        datasetId,
+        offset,
+        batchSize: batch.length,
+        totalItems: items.length + batch.length,
+      })
 
       if (batch.length === 0) {
         break
@@ -391,6 +471,11 @@ export class ApifyScraperService {
         break
       }
     }
+
+    console.log('[Apify] Dataset fetch completed:', {
+      datasetId,
+      totalItems: items.length,
+    })
 
     return items
   }
