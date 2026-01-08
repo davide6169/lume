@@ -753,6 +753,9 @@ async function processSearchJob(jobId: string, userId: string) {
         // Track metrics for cost calculation
         let totalCommentsFetched = 0
         let totalEnrichmentsPerformed = 0
+        let totalEmailsFound = 0
+        let totalEmailsVerified = 0
+        let totalEmbeddingsGenerated = 0
 
         // Initialize Apify production service if API key available
         if (apiKeys?.apify) {
@@ -1135,12 +1138,339 @@ async function processSearchJob(jobId: string, userId: string) {
         // ============================================
 
         // ============================================
-        // STEP 4: Database Save - Save enriched contacts
+        // STEP 6: Hunter.io Email Finder - Find missing emails
+        // ============================================
+
+        console.log('[JobProcessor] Starting Hunter.io Email Finder for missing emails')
+
+        // Find contacts without email
+        const contactsWithoutEmail = extractedContacts.filter((c: any) => !c.email || c.email.trim() === '')
+        console.log(`[JobProcessor] Found ${contactsWithoutEmail.length} contacts without email`)
+
+        if (contactsWithoutEmail.length > 0) {
+          update(85, {
+            timestamp: new Date().toISOString(),
+            event: 'EMAIL_FINDER_STARTED',
+            details: {
+              provider: 'Hunter.io',
+              endpoint: '/v2/email-finder',
+              contactsToProcess: contactsWithoutEmail.length,
+              task: 'Find missing email addresses'
+            }
+          })
+
+          // Check if Hunter.io API key is available
+          if (!apiKeys || !apiKeys.hunter) {
+            console.warn('[JobProcessor] No Hunter.io API key - skipping email finder')
+          } else {
+            const hunterService = createHunterIoService(apiKeys.hunter)
+            let emailsFound = 0
+            let emailsNotFound = 0
+
+            for (let i = 0; i < contactsWithoutEmail.length; i++) {
+              const contact = contactsWithoutEmail[i]
+              const progress = 85 + (i / contactsWithoutEmail.length) * 2.5
+
+              try {
+                // Try to find email using name + company
+                if (contact.firstName && contact.lastName && contact.company) {
+                  const finderResult = await hunterService.findEmail({
+                    first_name: contact.firstName,
+                    last_name: contact.lastName,
+                    domain: contact.company
+                  })
+
+                  if (finderResult && finderResult.data && finderResult.data.email) {
+                    contact.email = finderResult.data.email
+                    contact.emailFinderScore = finderResult.data.score
+                    contact.emailFinderSources = finderResult.data.sources?.length || 0
+                    emailsFound++
+                    console.log(`[JobProcessor] Email found for ${contact.firstName} ${contact.lastName}: ${contact.email}`)
+                  } else {
+                    emailsNotFound++
+                  }
+                } else {
+                  emailsNotFound++
+                  console.log(`[JobProcessor] Insufficient data for email finder: missing name or company`)
+                }
+              } catch (error) {
+                console.error(`[JobProcessor] Email finder failed for contact ${i + 1}:`, error)
+                emailsNotFound++
+              }
+            }
+
+            update(87.5, {
+              timestamp: new Date().toISOString(),
+              event: 'EMAIL_FINDER_COMPLETED',
+              details: {
+                provider: 'Hunter.io',
+                endpoint: '/v2/email-finder',
+                contactsProcessed: contactsWithoutEmail.length,
+                emailsFound,
+                emailsNotFound,
+                successRate: contactsWithoutEmail.length > 0 ? `${Math.round((emailsFound / contactsWithoutEmail.length) * 100)}%` : '0%'
+              }
+            })
+
+            console.log(`[JobProcessor] Email Finder completed: ${emailsFound} found, ${emailsNotFound} not found`)
+
+            // Track for cost calculation
+            totalEmailsFound = emailsFound
+          }
+        } else {
+          console.log('[JobProcessor] All contacts have emails - skipping email finder')
+        }
+
+        // ============================================
+        // End of Email Finder
+        // ============================================
+
+        // ============================================
+        // STEP 7: Hunter.io Email Verifier - Verify all emails
+        // ============================================
+
+        console.log('[JobProcessor] Starting Hunter.io Email Verifier')
+
+        // Get all contacts with emails
+        const contactsWithEmail = extractedContacts.filter((c: any) => c.email && c.email.trim() !== '')
+        console.log(`[JobProcessor] Found ${contactsWithEmail.length} contacts with email to verify`)
+
+        if (contactsWithEmail.length > 0) {
+          update(90, {
+            timestamp: new Date().toISOString(),
+            event: 'EMAIL_VERIFICATION_STARTED',
+            details: {
+              provider: 'Hunter.io',
+              endpoint: '/v2/email-verifier',
+              emailsToVerify: contactsWithEmail.length,
+              task: 'Verify email deliverability'
+            }
+          })
+
+          // Check if Hunter.io API key is available
+          if (!apiKeys || !apiKeys.hunter) {
+            console.warn('[JobProcessor] No Hunter.io API key - skipping email verifier')
+          } else {
+            const hunterService = createHunterIoService(apiKeys.hunter)
+            let verificationResults = {
+              valid: 0,
+              acceptAll: 0,
+              unknown: 0,
+              invalid: 0,
+              disposable: 0
+            }
+
+            for (let i = 0; i < contactsWithEmail.length; i++) {
+              const contact = contactsWithEmail[i]
+              const progress = 90 + (i / contactsWithEmail.length) * 2
+
+              try {
+                const verificationResult = await hunterService.verifyEmail({ email: contact.email })
+
+                if (verificationResult && verificationResult.data) {
+                  contact.emailVerification = {
+                    status: verificationResult.data.status,
+                    score: verificationResult.data.score,
+                    webmail: verificationResult.data.webmail,
+                    disposable: verificationResult.data.disposable
+                  }
+
+                  // Count results
+                  const status = verificationResult.data.status
+                  if (status === 'valid') verificationResults.valid++
+                  else if (status === 'accept_all') verificationResults.acceptAll++
+                  else if (status === 'unknown') verificationResults.unknown++
+                  else if (status === 'invalid') verificationResults.invalid++
+
+                  if (verificationResult.data.disposable) {
+                    verificationResults.disposable++
+                  }
+
+                  console.log(`[JobProcessor] Email verified: ${contact.email} - ${status} (${verificationResult.data.score})`)
+                }
+              } catch (error) {
+                console.error(`[JobProcessor] Email verification failed for ${contact.email}:`, error)
+                contact.emailVerification = {
+                  status: 'unknown',
+                  error: error instanceof Error ? error.message : 'Unknown error'
+                }
+              }
+            }
+
+            update(92, {
+              timestamp: new Date().toISOString(),
+              event: 'EMAIL_VERIFICATION_COMPLETED',
+              details: {
+                provider: 'Hunter.io',
+                endpoint: '/v2/email-verifier',
+                emailsVerified: contactsWithEmail.length,
+                results: verificationResults,
+                deliverabilityRate: contactsWithEmail.length > 0
+                  ? `${Math.round(((verificationResults.valid + verificationResults.acceptAll) / contactsWithEmail.length) * 100)}%`
+                  : '0%'
+              }
+            })
+
+            console.log('[JobProcessor] Email Verifier completed:', verificationResults)
+
+            // Track for cost calculation
+            totalEmailsVerified = contactsWithEmail.length
+          }
+        } else {
+          console.log('[JobProcessor] No contacts with emails to verify')
+        }
+
+        // ============================================
+        // End of Email Verifier
+        // ============================================
+
+        // ============================================
+        // STEP 8: Mixedbread Embeddings - Generate vector embeddings
+        // ============================================
+
+        console.log('[JobProcessor] Starting Mixedbread embedding generation')
+
+        update(92.5, {
+          timestamp: new Date().toISOString(),
+          event: 'EMBEDDINGS_STARTED',
+          details: {
+            provider: 'Mixedbread',
+            model: 'mixedbread-ai/mxbai-embed-large-v1',
+            contactsToEmbed: extractedContacts.length,
+            task: 'Generate vector embeddings for semantic search'
+          }
+        })
+
+        // Check if Mixedbread API key is available
+        if (!apiKeys || !apiKeys.mixedbread) {
+          console.warn('[JobProcessor] No Mixedbread API key - skipping embeddings')
+        } else {
+          const mixedbreadService = createMixedbreadService(apiKeys.mixedbread)
+          console.log('[JobProcessor] Mixedbread service initialized')
+
+          try {
+            // Generate embeddings for each contact in batches
+            const batchSize = 10
+            const totalBatches = Math.ceil(extractedContacts.length / batchSize)
+            let embeddingsGenerated = 0
+
+            for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+              const startIdx = batchIndex * batchSize
+              const endIdx = Math.min(startIdx + batchSize, extractedContacts.length)
+              const batch = extractedContacts.slice(startIdx, endIdx)
+
+              console.log(`[JobProcessor] Processing embedding batch ${batchIndex + 1}/${totalBatches}`)
+
+              for (const contact of batch) {
+                try {
+                  // Generate embedding for contact
+                  const embedding = await mixedbreadService.embedContact(contact)
+                  contact.embedding = embedding
+                  contact.embeddingModel = 'mxbai-embed-large-v1'
+                  contact.embeddingDimension = embedding.length
+                  embeddingsGenerated++
+                } catch (error) {
+                  console.error(`[JobProcessor] Failed to generate embedding for contact:`, error)
+                  contact.embeddingError = error instanceof Error ? error.message : 'Unknown error'
+                }
+              }
+
+              // Update progress
+              const batchProgress = 92.5 + ((batchIndex + 1) / totalBatches) * 2.5
+              update(batchProgress, {
+                timestamp: new Date().toISOString(),
+                event: 'EMBEDDINGS_PROGRESS',
+                details: {
+                  provider: 'Mixedbread',
+                  model: 'mixedbread-ai/mxbai-embed-large-v1',
+                  batchNumber: batchIndex + 1,
+                  totalBatches: totalBatches,
+                  embeddingsGenerated: embeddingsGenerated,
+                  contactsProcessed: endIdx
+                }
+              })
+            }
+
+            console.log(`[JobProcessor] Embeddings generated: ${embeddingsGenerated}/${extractedContacts.length}`)
+
+            // Track for cost calculation
+            totalEmbeddingsGenerated = embeddingsGenerated
+
+            // Calculate sample similarity if we have at least 2 embeddings
+            if (embeddingsGenerated >= 2) {
+              const contactsWithEmbeddings = extractedContacts.filter((c: any) => c.embedding && c.embedding.length > 0)
+              if (contactsWithEmbeddings.length >= 2) {
+                const similarity = mixedbreadService.cosineSimilarity(
+                  contactsWithEmbeddings[0].embedding,
+                  contactsWithEmbeddings[1].embedding
+                )
+
+                console.log('[JobProcessor] Sample similarity calculated:', similarity)
+
+                update(95, {
+                  timestamp: new Date().toISOString(),
+                  event: 'EMBEDDINGS_COMPLETED',
+                  details: {
+                    provider: 'Mixedbread',
+                    model: 'mixedbread-ai/mxbai-embed-large-v1',
+                    embeddingDimension: contactsWithEmbeddings[0].embeddingDimension || 1024,
+                    embeddingsGenerated: embeddingsGenerated,
+                    totalContacts: extractedContacts.length,
+                    sampleSimilarity: {
+                      contact1: `${contactsWithEmbeddings[0].firstName} ${contactsWithEmbeddings[0].lastName}`,
+                      contact2: `${contactsWithEmbeddings[1].firstName} ${contactsWithEmbeddings[1].lastName}`,
+                      score: similarity
+                    }
+                  }
+                })
+              } else {
+                update(95, {
+                  timestamp: new Date().toISOString(),
+                  event: 'EMBEDDINGS_COMPLETED',
+                  details: {
+                    provider: 'Mixedbread',
+                    model: 'mixedbread-ai/mxbai-embed-large-v1',
+                    embeddingsGenerated: embeddingsGenerated,
+                    totalContacts: extractedContacts.length
+                  }
+                })
+              }
+            } else {
+              update(95, {
+                timestamp: new Date().toISOString(),
+                event: 'EMBEDDINGS_COMPLETED',
+                details: {
+                  provider: 'Mixedbread',
+                  embeddingsGenerated: embeddingsGenerated,
+                  totalContacts: extractedContacts.length,
+                  note: 'Insufficient embeddings for similarity calculation'
+                }
+              })
+            }
+          } catch (error) {
+            console.error('[JobProcessor] Exception during Mixedbread embeddings:', error)
+            update(95, {
+              timestamp: new Date().toISOString(),
+              event: 'EMBEDDINGS_FAILED',
+              details: {
+                provider: 'Mixedbread',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            })
+          }
+        }
+
+        // ============================================
+        // End of Mixedbread Embeddings
+        // ============================================
+
+        // ============================================
+        // STEP 9: Database Save - Save enriched contacts
         // ============================================
 
         console.log(`[JobProcessor] Starting database save for ${extractedContacts.length} contacts`)
 
-        update(95, {
+        update(97.5, {
           timestamp: new Date().toISOString(),
           event: 'DATABASE_SAVE_STARTED',
           details: {
@@ -1195,7 +1525,7 @@ async function processSearchJob(jobId: string, userId: string) {
             console.log('[JobProcessor] Source audiences updated to completed status')
           }
 
-          update(98, {
+          update(98.5, {
             timestamp: new Date().toISOString(),
             event: 'DATABASE_SAVE_COMPLETED',
             details: {
@@ -1273,6 +1603,46 @@ async function processSearchJob(jobId: string, userId: string) {
               cost: apolloCost
             })
             console.log(`[JobProcessor] Apollo cost: $${apolloCost.toFixed(4)} (${totalEnrichmentsPerformed} enrichments)`)
+          }
+
+          // Calculate Hunter.io Email Finder cost
+          if (totalEmailsFound > 0) {
+            const hunterFinderCost = totalEmailsFound * API_PRICING.hunter.email_finder
+            costsToInsert.push({
+              user_id: userId,
+              service: 'hunter',
+              operation: 'email_finder',
+              cost: hunterFinderCost
+            })
+            console.log(`[JobProcessor] Hunter Email Finder cost: $${hunterFinderCost.toFixed(4)} (${totalEmailsFound} emails found)`)
+          }
+
+          // Calculate Hunter.io Email Verifier cost
+          if (totalEmailsVerified > 0) {
+            const hunterVerifierCost = totalEmailsVerified * API_PRICING.hunter.email_verifier
+            costsToInsert.push({
+              user_id: userId,
+              service: 'hunter',
+              operation: 'email_verifier',
+              cost: hunterVerifierCost
+            })
+            console.log(`[JobProcessor] Hunter Email Verifier cost: $${hunterVerifierCost.toFixed(4)} (${totalEmailsVerified} emails verified)`)
+          }
+
+          // Calculate Mixedbread embeddings cost
+          if (totalEmbeddingsGenerated > 0) {
+            // Estimate: ~50 tokens per contact for embedding
+            const estimatedTokens = totalEmbeddingsGenerated * 50
+            const mixedbreadCost = estimatedTokens * API_PRICING.mixedbread.per_token
+            if (mixedbreadCost > 0.0001) { // Only track if cost > $0.0001
+              costsToInsert.push({
+                user_id: userId,
+                service: 'mixedbread',
+                operation: 'embeddings_generation',
+                cost: mixedbreadCost
+              })
+              console.log(`[JobProcessor] Mixedbread cost: $${mixedbreadCost.toFixed(4)} (${totalEmbeddingsGenerated} embeddings, ${estimatedTokens} tokens est.)`)
+            }
           }
 
           // Insert all costs
