@@ -179,11 +179,11 @@ export class ApifyScraperService {
       // Start Apify Instagram scraper
       const run = await this.startInstagramScraper(url, options)
 
-      // Wait for completion (pass actor ID)
-      await this.waitForRun(run.id, 'apify~instagram-scraper')
+      // Wait for completion and get updated run object with datasetId
+      const completedRun = await this.waitForRun(run.id, 'apify~instagram-scraper')
 
-      // Fetch results
-      const datasetId = run.datasetId
+      // Fetch results using datasetId from completed run
+      const datasetId = completedRun.datasetId
       const items = await this.fetchDataset(datasetId)
 
       // Transform to InstagramComment format
@@ -290,11 +290,11 @@ export class ApifyScraperService {
       // Start Apify Facebook scraper
       const run = await this.startFacebookScraper(url, options)
 
-      // Wait for completion (pass actor ID)
-      await this.waitForRun(run.id, 'apify~facebook-posts-scraper')
+      // Wait for completion and get updated run object with datasetId
+      const completedRun = await this.waitForRun(run.id, 'apify~facebook-posts-scraper')
 
-      // Fetch results
-      const datasetId = run.datasetId
+      // Fetch results using datasetId from completed run
+      const datasetId = completedRun.datasetId
       const items = await this.fetchDataset(datasetId)
 
       // Transform to FacebookComment format
@@ -407,8 +407,9 @@ export class ApifyScraperService {
 
   /**
    * Wait for an Apify run to complete
+   * @returns The completed run object with datasetId populated
    */
-  private async waitForRun(runId: string, actorId: string, maxWaitTime: number = 300000): Promise<void> {
+  private async waitForRun(runId: string, actorId: string, maxWaitTime: number = 300000): Promise<ApifyRunResponse> {
     const startTime = Date.now()
     const pollInterval = 2000 // Check every 2 seconds
 
@@ -447,13 +448,38 @@ export class ApifyScraperService {
       })
 
       if (run.status === 'SUCCEEDED') {
-        console.log('[Apify] Run completed successfully:', {
-          runId,
-          datasetId: run.datasetId,
-          startedAt: run.startedAt,
-          finishedAt: run.finishedAt,
+        // Make one final GET request to get complete run details including datasetId
+        const finalResponse = await fetch(statusUrl, {
+          headers: {
+            'Authorization': `Bearer ${this.apiToken}`,
+          },
         })
-        return
+
+        if (finalResponse.ok) {
+          const finalData = await finalResponse.json()
+          const finalRun: ApifyRunResponse = finalData.data
+
+          console.log('[Apify] Run completed successfully:', {
+            runId,
+            datasetId: finalRun.datasetId,
+            startedAt: finalRun.startedAt,
+            finishedAt: finalRun.finishedAt,
+          })
+
+          // Store the datasetId on the run object so it can be accessed later
+          run.datasetId = finalRun.datasetId
+
+          return finalRun
+        } else {
+          console.log('[Apify] Run completed successfully:', {
+            runId,
+            datasetId: run.datasetId,
+            startedAt: run.startedAt,
+            finishedAt: run.finishedAt,
+          })
+
+          return run
+        }
       }
 
       if (run.status === 'FAILED' || run.status === 'TIMED-OUT' || run.status === 'ABORTED') {
