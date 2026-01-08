@@ -106,6 +106,26 @@ export class ApifyScraperService {
 
     // Instagram patterns
     if (cleanUrl.includes('instagram.com')) {
+      // Match post: instagram.com/p/{post_id}/
+      const postMatch = cleanUrl.match(/instagram\.com\/p\/([^/?]+)/)
+      if (postMatch) {
+        return {
+          platform: 'instagram',
+          type: 'post',
+          id: postMatch[1],
+        }
+      }
+
+      // Match reel: instagram.com/reel/{reel_id}/
+      const reelMatch = cleanUrl.match(/instagram\.com\/reel\/([^/?]+)/)
+      if (reelMatch) {
+        return {
+          platform: 'instagram',
+          type: 'reel',
+          id: reelMatch[1],
+        }
+      }
+
       // Match profile: instagram.com/{username}
       const profileMatch = cleanUrl.match(/instagram\.com\/([^/?]+)/)
       if (profileMatch) {
@@ -141,16 +161,17 @@ export class ApifyScraperService {
     // Check if URL is a profile (not supported)
     if (parsed.type === 'profile') {
       throw new Error(
-        'Instagram profile URLs are not supported. Please use a specific post URL.\n' +
+        'Instagram profile URLs are not supported. Please use a specific post or reel URL.\n' +
         'Supported formats:\n' +
         '  - https://www.instagram.com/p/ABC123/ (post)\n' +
         '  - https://www.instagram.com/reel/ABC123/ (reel)\n' +
-        'To get a post URL:\n' +
+        'To get a post/reel URL:\n' +
         '  1. Open Instagram\n' +
         '  2. Find a post with comments\n' +
         '  3. Click the three dots (•••) on the post\n' +
         '  4. Select "Copy link"\n' +
-        '  5. Paste that URL here'
+        '  5. Paste that URL here\n\n' +
+        'Note: Profile URLs like "instagram.com/username" will NOT work.'
       )
     }
 
