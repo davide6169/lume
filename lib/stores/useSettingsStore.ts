@@ -122,23 +122,47 @@ export const useSettingsStore = create<SettingsState>()(
           return { apiKeys: newKeys }
         }),
 
-      setSupabaseConfig: (url, anonKey) => {
-        // Store Supabase config as-is (will be encrypted by storage middleware)
+      setSupabaseConfig: async (url, anonKey) => {
+        // Store Supabase config in localStorage (will be encrypted by storage middleware)
         set(() => ({
           supabaseConfig: {
             url: url.trim(),
             anonKey: anonKey.trim(),
           },
         }))
+
+        // Also save to httpOnly cookie so server can access it for auth
+        try {
+          await fetch('/api/settings/save-db-credentials', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url.trim(), anonKey: anonKey.trim() }),
+          })
+        } catch (error) {
+          console.error('Failed to save database credentials to cookie:', error)
+          // Non-critical error - localStorage still works
+        }
       },
 
-      clearSupabaseConfig: () =>
+      clearSupabaseConfig: async () => {
+        // Clear from localStorage
         set((state) => ({
           supabaseConfig: {
             url: '',
             anonKey: '',
           },
-        })),
+        }))
+
+        // Also remove from httpOnly cookie
+        try {
+          await fetch('/api/settings/save-db-credentials', {
+            method: 'DELETE',
+          })
+        } catch (error) {
+          console.error('Failed to remove database credentials from cookie:', error)
+          // Non-critical error - localStorage still cleared
+        }
+      },
 
       hasUserSupabaseConfig: () => {
         const { supabaseConfig } = get()

@@ -1,16 +1,22 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { publicEnv, serverEnv, hasRealApiKeys } from '@/lib/config/env'
+import { getDatabaseCredentialsFromCookie } from '@/lib/utils/db-credentials-cookie'
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies()
 
-  // NOTE: Server-side client always uses environment variables
-  // This is intentional - user-configured credentials are only used client-side
-  // Server-side auth (login/signup) needs a shared Supabase instance
+  // First, try to get user-configured database credentials from cookie
+  const userCredentials = await getDatabaseCredentialsFromCookie()
+
+  // Use user credentials if available, otherwise fall back to environment variables
+  // This allows demo users to configure their own database and use it for auth
+  const supabaseUrl = userCredentials?.url || publicEnv.supabaseUrl
+  const supabaseAnonKey = userCredentials?.anonKey || publicEnv.supabaseAnonKey
+
   return createServerClient(
-    publicEnv.supabaseUrl,
-    publicEnv.supabaseAnonKey,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -35,10 +41,18 @@ export async function createSupabaseServerClient() {
 export async function createSupabaseServiceClient() {
   const cookieStore = await cookies()
 
-  // NOTE: Service client always uses environment variables
-  // Used for admin operations that need to bypass RLS
+  // Service client also uses user credentials if available
+  // This is needed for admin operations on the user's database
+  const userCredentials = await getDatabaseCredentialsFromCookie()
+
+  // For service client, we need service role key
+  // Since we can't derive service role key from user credentials,
+  // we fall back to env variables for service client
+  // This is acceptable because service client is only used for admin operations
+  const supabaseUrl = userCredentials?.url || publicEnv.supabaseUrl
+
   return createServerClient(
-    publicEnv.supabaseUrl,
+    supabaseUrl,
     serverEnv.supabaseServiceKey,
     {
       cookies: {
