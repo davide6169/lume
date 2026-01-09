@@ -31,6 +31,39 @@ npx tsx lib/workflow-engine/examples/complete-example.ts
 
 ---
 
+### [csv-workflow-enrichment-example.ts](./csv-workflow-enrichment-example.ts)
+**Level:** Intermediate | **NEW!**
+
+**Demonstrates the power of workflow-based approach vs monolithic blocks!**
+
+This example shows how to compose multiple blocks to create a CSV enrichment pipeline:
+- **Input:** CSV with columns (nome, celular, email, nascimento)
+- **Workflow:** 7+ composed blocks (Country, Filter, Apollo, Instagram, AI, etc.)
+- **Output:** CSV with added "interessi" column (comma-separated)
+- **Filtering:** Only rows where at least one interest was found
+
+**Architecture:**
+```
+Input CSV → Country Detection → Filter Business → Apollo LinkedIn
+                                              ↓
+                                         Instagram Search
+                                              ↓
+                                       AI Interest Extraction
+                                              ↓
+                                       Filter Empty Interests
+                                              ↓
+                                            Output CSV
+```
+
+**Key Insight:** Compare this workflow approach with the monolithic `csv-interest-enrichment-example.ts` to see the power of composable blocks!
+
+**Run it:**
+```bash
+npx tsx lib/workflow-engine/examples/csv-workflow-enrichment-example.ts
+```
+
+---
+
 ## 🧩 Block Reusability Examples
 
 ### [block-reusability-examples.ts](./block-reusability-examples.ts)
