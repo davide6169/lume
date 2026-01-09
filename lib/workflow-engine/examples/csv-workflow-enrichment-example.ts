@@ -159,13 +159,13 @@ const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
       outputSchema: { type: 'array' }
     },
     {
-      id: 'apollo-enrichment',
-      type: 'api.apollo',
-      name: 'LinkedIn Enrichment',
-      description: 'Enrich with LinkedIn data via Apollo',
+      id: 'linkedin-search',
+      type: 'api.apify',
+      name: 'LinkedIn Profile Search',
+      description: 'Search LinkedIn profile via Apify (business emails only)',
       config: {
-        apiKey: '{{secrets.apollo}}',
-        emailField: 'email'
+        apiToken: '{{secrets.apify}}',
+        actor: 'supreme_coder/linkedin-profile-scraper'
       },
       inputSchema: { type: 'array' },
       outputSchema: { type: 'array' }
@@ -225,7 +225,7 @@ const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
   edges: [
     { id: 'e1', source: 'input-csv', target: 'detect-country' },
     { id: 'e2', source: 'detect-country', target: 'filter-business' },
-    { id: 'e3', source: 'filter-business', target: 'apollo-enrichment' },
+    { id: 'e3', source: 'filter-business', target: 'linkedin-search' },
     { id: 'e4', source: 'detect-country', target: 'instagram-search' },
     { id: 'e5', source: 'instagram-search', target: 'extract-interests' },
     { id: 'e6', source: 'extract-interests', target: 'filter-empty' },
@@ -289,7 +289,8 @@ async function demonstrateWorkflowApproach() {
   3. Filter Business Emails (filter)
      → Separates business vs personal emails
      ↓
-     ├─→ 4a. Apollo LinkedIn (api.apollo)
+     ├─→ 4a. LinkedIn Search (api.apify)
+     │       → Apify actor: supreme_coder/linkedin-profile-scraper
      │       → For business emails only
      │
      └─→ 4b. Instagram Search (api.apify)
@@ -318,9 +319,9 @@ These SAME blocks can be reused in OTHER workflows:
    → Here: Filter business emails
    → Also for: Data cleaning, Sentiment filtering, Lead scoring
 
-3. api.apollo
-   → Here: LinkedIn enrichment
-   → Also for: B2B enrichment, Company lookup, Verification
+3. api.apify
+   → Here: LinkedIn & Instagram search
+   → Also for: Facebook scraping, Twitter data, Social media analysis
 
 4. ai.interestInference
    → Here: Extract interests from bio
@@ -363,7 +364,7 @@ Instead of writing NEW code for each use case, REUSE blocks:
     Input → Contact Extraction → Interest Inference → Output
 
   Lead Enrichment:
-    Input → Country → Filter → Apollo → AI → Output
+    Input → Country → Filter → Apify (LinkedIn) → AI → Output
 
   Data Validation:
     Input → Country → Validate → Format → Output
