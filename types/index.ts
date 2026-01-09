@@ -110,7 +110,7 @@ export interface LogEntry {
 export interface Job {
   id: string;
   userId: string;
-  type: 'SEARCH' | 'UPLOAD_TO_META';
+  type: 'SEARCH' | 'UPLOAD_TO_META' | 'WORKFLOW';
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   progress: number; // 0-100
   payload: Record<string, any>;
@@ -128,6 +128,19 @@ export interface Job {
   completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Workflow Job Payload
+ * Payload specific for WORKFLOW type jobs
+ */
+export interface WorkflowJobPayload {
+  workflowId: string; // Workflow definition ID
+  workflowDefinition?: any; // Optional inline workflow definition
+  input: any; // Input data for the workflow
+  mode?: 'production' | 'demo' | 'test';
+  variables?: Record<string, any>;
+  metadata?: Record<string, any>;
 }
 
 // ============================================

@@ -1,6 +1,6 @@
 /**
  * Background Job Processor
- * Handles async job processing for Search and Upload operations
+ * Handles async job processing for Search, Upload, and Workflow operations
  */
 
 import { Job } from '@/types'
@@ -69,7 +69,7 @@ export class JobProcessor {
    */
   createJob(
     userId: string,
-    type: 'SEARCH' | 'UPLOAD_TO_META',
+    type: 'SEARCH' | 'UPLOAD_TO_META' | 'WORKFLOW',
     payload: Record<string, any>
   ): Job {
     // Use crypto.randomUUID() for guaranteed unique IDs (fixes race condition)

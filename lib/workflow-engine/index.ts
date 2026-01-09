@@ -41,6 +41,9 @@ export {
 // Database Integration
 export * from './database'
 
+// Job Integration
+export * from './job'
+
 // Block registration
 export { registerAllBuiltInBlocks } from './blocks'
 

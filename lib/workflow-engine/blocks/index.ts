@@ -83,6 +83,15 @@ export {
   type CountryConfigOutput
 } from './countries/country-config.block'
 
+// Enrichment Blocks
+export {
+  LeadEnrichmentBlock,
+  type LeadEnrichmentInput,
+  type LeadEnrichmentConfig,
+  type LeadEnrichmentOutput,
+  type EnrichedContact
+} from './enrichment/lead-enrichment.block'
+
 /**
  * Register all built-in blocks to the registry
  */
@@ -100,6 +109,7 @@ import { SentimentAnalysisBlock } from './ai/sentiment-analysis.block'
 import { FilterBlock } from './filter/filter.block'
 import { BranchBlock } from './branch/branch.block'
 import { CountryConfigBlock } from './countries/country-config.block'
+import { LeadEnrichmentBlock } from './enrichment/lead-enrichment.block'
 
 export function registerAllBuiltInBlocks(): void {
   // API Blocks
@@ -187,6 +197,14 @@ export function registerAllBuiltInBlocks(): void {
     name: 'Country Configuration',
     description: 'Automatically detects country and provides country-specific configuration',
     category: 'countries',
+    version: '1.0.0'
+  })
+
+  // Enrichment Blocks
+  registerBlock('enrichment.lead', LeadEnrichmentBlock as any, {
+    name: 'Lead Enrichment',
+    description: 'Complete lead enrichment workflow combining 3 strategies: Country detection, LinkedIn via Apollo (business emails only), and LLM interest inference',
+    category: 'enrichment',
     version: '1.0.0'
   })
 
