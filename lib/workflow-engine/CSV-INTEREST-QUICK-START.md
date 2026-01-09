@@ -22,7 +22,10 @@ Luca Bianchi;3282345678;luca.bianchi@mydomain.com;27/01/1983;cinema italiano, re
 Giuseppe Verdi;3273456789;giuseppe.verdi@mydomain.com;;opera lirica, musica classica, pianoforte
 ```
 
-**NOTA:** Il campo `interessi` viene aggiunto alla fine. Se non troviamo dati bio, il campo è vuoto.
+**IMPORTANTE:**
+- ✅ Il CSV di output contiene **SOLO** i record con almeno un interesse
+- ❌ I record senza interessi vengono **FILTRATI** e non inclusi nel CSV
+- 🔍 Se nessun contatto ha interessi, il CSV avrà solo l'header
 
 ## ⚙️ Come Funziona
 
@@ -117,11 +120,13 @@ const result = await block.execute(config, input, context)
 Per 100 contatti italiani con email business:
 
 ```
-✅ 50 contatti con interessi REALI (da LinkedIn/Instagram)
-⚠️ 50 contatti con campo interessi VUOTO (nessun profilo social trovato)
+📥 Input:  100 contatti
+✅ Con interessi trovati:  50
+❌ Senza interessi:  50 (filtrati dal CSV output)
+📤 Output: 50 record
 
 💰 Costo totale: $2.62
-📈 Coverage: 50% con dati verificati
+📈 Coverage output: 50/100 = 50% (tutti con dati verificati)
 ```
 
 ## 🎯 File Creati

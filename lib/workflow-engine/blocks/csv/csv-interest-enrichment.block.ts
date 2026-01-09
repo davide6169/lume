@@ -51,13 +51,15 @@ export interface CSVInterestEnrichmentOutput {
       celular: string
       email: string
       nascimento: string
-      interessi: string // ← CAMPO AGGIUNTIVO
+      interessi: string // ← CAMPO AGGIUNTIVO (solo se trovato)
     }>
   }
   metadata: {
     totalContacts: number
     contactsWithInterests: number
     contactsWithoutInterests: number
+    filteredContacts: number  // Record filtrati (senza interessi)
+    outputRecords: number  // Record nel CSV output
     countryDetected: number
     linkedinFound: number
     instagramFound: number
@@ -234,16 +236,20 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
         })
       }
 
-      // Prepare output
+      // Prepare output - FILTER: only rows with interests
+      const rowsWithInterests = enrichedRows.filter(row => row.interessi && row.interessi.trim().length > 0)
+
       const output: CSVInterestEnrichmentOutput = {
         csv: {
           headers: [...input.csv.headers, 'interessi'],
-          rows: enrichedRows
+          rows: rowsWithInterests  // ← SOLO record con interessi
         },
         metadata: {
           totalContacts: contacts.length,
           contactsWithInterests,
           contactsWithoutInterests,
+          filteredContacts: enrichedRows.length - rowsWithInterests.length,
+          outputRecords: rowsWithInterests.length,
           countryDetected,
           linkedinFound,
           instagramFound,
@@ -259,6 +265,8 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
         totalContacts: contacts.length,
         contactsWithInterests,
         contactsWithoutInterests,
+        filteredContacts: enrichedRows.length - rowsWithInterests.length,
+        outputRecords: rowsWithInterests.length,
         totalCost: totalCost.toFixed(4),
         avgCostPerContact: (totalCost / contacts.length).toFixed(4)
       })

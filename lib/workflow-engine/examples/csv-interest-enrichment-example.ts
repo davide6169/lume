@@ -164,14 +164,18 @@ async function runCSVInterestEnrichment() {
 
     // Show statistics
     console.log('📊 STATISTICHE:')
-    console.log(`   Totali contatti:        ${metadata.totalContacts}`)
-    console.log(`   Con interessi:          ${metadata.contactsWithInterests} (${Math.round(metadata.contactsWithInterests / metadata.totalContacts * 100)}%)`)
-    console.log(`   Senza interessi:        ${metadata.contactsWithoutInterests} (${Math.round(metadata.contactsWithoutInterests / metadata.totalContacts * 100)}%)`)
+    console.log(`   Totali contatti input:   ${metadata.totalContacts}`)
+    console.log(`   Con interessi:          ${metadata.contactsWithInterests}`)
+    console.log(`   Senza interessi:        ${metadata.contactsWithoutInterests}`)
+    console.log(`   Filtrati (no interessi): ${metadata.filteredContacts}`)
+    console.log(`   Record output CSV:      ${metadata.outputRecords} ⭐`)
     console.log(`   Country rilevati:       ${metadata.countryDetected}`)
     console.log(`   LinkedIn trovati:       ${metadata.linkedinFound}`)
     console.log(`   Instagram trovati:      ${metadata.instagramFound}`)
     console.log(`   Costo totale:           $${metadata.totalCost.toFixed(4)}`)
     console.log(`   Costo medio per cont.:  $${metadata.avgCostPerContact.toFixed(4)}`)
+    console.log()
+    console.log('⚠️  NOTA: Il CSV di output contiene SOLO i record con interessi trovati')
     console.log()
 
     // Show enriched CSV
