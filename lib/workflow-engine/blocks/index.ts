@@ -92,6 +92,14 @@ export {
   type EnrichedContact
 } from './enrichment/lead-enrichment.block'
 
+// CSV Blocks
+export {
+  CSVInterestEnrichmentBlock,
+  type CSVInterestEnrichmentInput,
+  type CSVInterestEnrichmentConfig,
+  type CSVInterestEnrichmentOutput
+} from './csv/csv-interest-enrichment.block'
+
 /**
  * Register all built-in blocks to the registry
  */
@@ -110,6 +118,7 @@ import { FilterBlock } from './filter/filter.block'
 import { BranchBlock } from './branch/branch.block'
 import { CountryConfigBlock } from './countries/country-config.block'
 import { LeadEnrichmentBlock } from './enrichment/lead-enrichment.block'
+import { CSVInterestEnrichmentBlock } from './csv/csv-interest-enrichment.block'
 
 export function registerAllBuiltInBlocks(): void {
   // API Blocks
@@ -205,6 +214,14 @@ export function registerAllBuiltInBlocks(): void {
     name: 'Lead Enrichment',
     description: 'Complete lead enrichment workflow combining 3 strategies: Country detection, LinkedIn via Apollo (business emails only), and LLM interest inference',
     category: 'enrichment',
+    version: '1.0.0'
+  })
+
+  // CSV Blocks
+  registerBlock('csv.interestEnrichment', CSVInterestEnrichmentBlock as any, {
+    name: 'CSV Interest Enrichment',
+    description: 'Enrich CSV with interests field. Adds "interessi" column with comma-separated interests extracted from LinkedIn/Instagram. Empty if no bio data found.',
+    category: 'csv',
     version: '1.0.0'
   })
 
