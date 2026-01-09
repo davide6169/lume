@@ -114,7 +114,121 @@ Supports multiple reference types:
 - `{{workflow.id}}` - Workflow metadata
 - `{{env.NODE_ENV}}` - Environment variables
 
-## Quick Start
+## 🚀 Getting Started Guide
+
+**New to the workflow engine? Start here!**
+
+We have comprehensive documentation to help you get started quickly:
+
+### 1. Learn the Basics
+
+**Read:** [Workflow Building Guide - Step-by-Step](./WORKFLOW-BUILDING-GUIDE.md)
+
+A complete step-by-step guide that teaches you:
+- How to choose the right blocks for your use case
+- How to design and structure a workflow
+- How to define workflows in JSON/TypeScript
+- How to validate and execute workflows
+- How to debug and monitor execution
+
+**Perfect for:** First-time users, learning the system
+
+---
+
+### 2. Understand Block Reusability
+
+**Read:** [Block Reusability Guide - Architecture & Best Practices](./BLOCK-REUSABILITY-GUIDE.md)
+
+Learn how blocks are designed as reusable microservices:
+- Microservices architecture principles
+- Composition patterns (sequential, parallel, branching, merge)
+- Best practices for block usage
+- Anti-patterns to avoid
+
+**Perfect for:** Understanding the architecture, building production workflows
+
+---
+
+### 3. Quick Block Reference
+
+**Read:** [Blocks Quick Reference Card](./BLOCKS-QUICK-REFERENCE.md)
+
+Fast lookup for all blocks:
+- Complete block catalog (14+ blocks)
+- Input/output formats
+- Use cases for each block
+- Cost estimates
+- Quick configuration examples
+
+**Perfect for:** Finding the right block quickly
+
+---
+
+### 4. Try Ready-to-Use Templates
+
+**Run:** [Workflow Templates](./examples/workflow-templates.ts)
+
+Five production-ready templates you can copy and customize:
+
+1. **Simple Data Pipeline** (Beginner) - Basic ETL
+2. **Lead Enrichment Pipeline** (Intermediate) - Complete lead scoring
+3. **AI Content Processing** (Advanced) - Social media analysis
+4. **Batch Data Processing** (Advanced) - Large dataset enrichment
+5. **Multi-Source Data Fusion** (Intermediate) - CRM integration
+
+**Perfect for:** Quick start with real use cases
+
+---
+
+### 5. See Blocks in Action
+
+**Run:** [Block Reusability Examples](./examples/block-reusability-examples.ts)
+
+Demonstrates how the SAME blocks work in DIFFERENT contexts:
+- FilterBlock: Data cleaning, lead enrichment, sentiment filtering
+- OpenRouterBlock: Contact extraction, interest inference, sentiment analysis
+- CountryConfigBlock: Localized enrichment, content localization, validation
+
+**Perfect for:** Understanding reusability, learning by example
+
+---
+
+### 6. Explore Examples
+
+**Browse:** [Examples README](./examples/README.md)
+
+All available examples organized by level and use case:
+- Getting Started Examples
+- Block Reusability Examples
+- Workflow Templates
+- Real-World Examples
+- Integration Examples
+- CSV Processing Examples
+
+**Perfect for:** Finding relevant examples for your use case
+
+---
+
+## 🎯 Recommended Learning Path
+
+### Beginner (Day 1)
+1. Read [Workflow Building Guide](./WORKFLOW-BUILDING-GUIDE.md) - Steps 1-3
+2. Run [complete-example.ts](./examples/complete-example.ts)
+3. Try [simple-data-pipeline](./examples/workflow-templates.ts) template
+
+### Intermediate (Day 2-3)
+1. Read [Block Reusability Guide](./BLOCK-REUSABILITY-GUIDE.md)
+2. Run [block-reusability-examples.ts](./examples/block-reusability-examples.ts)
+3. Build your first workflow with 3-4 blocks
+
+### Advanced (Week 1)
+1. Study [ai-workflow-example.ts](./examples/ai-workflow-example.ts)
+2. Use [batch-data-processing](./examples/workflow-templates.ts) template
+3. Create custom blocks for your needs
+
+---
+
+## Quick Start (Original)
 
 ### 1. Define a Workflow
 
