@@ -40,6 +40,7 @@ export interface CSVInterestEnrichmentConfig {
   openrouterToken: string // {{secrets.openrouter}}
   enableLinkedIn?: boolean // Default: true
   enableInstagram?: boolean // Default: true
+  llmModel?: string // Default: "google/gemma-2-27b-it" (ottimo per italiano)
   maxCostPerContact?: number // Default: 0.10 (massimo $0.10 per contatto)
 }
 
@@ -178,6 +179,7 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
               instagramData,
               countryData,
               config.openrouterToken,
+              config.llmModel, // ← Passa il modello configurabile
               context
             )
             interests.push(...instagramInterests)
@@ -483,6 +485,7 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
     instagramData: any,
     countryData: any,
     openrouterToken: string,
+    llmModel: string = 'google/gemma-2-27b-it', // Default model
     context: ExecutionContext
   ): Promise<string[]> {
     try {
@@ -505,7 +508,7 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'google/gemma-2-27b-it', // Good for Italian
+          model: llmModel, // ← Modello configurabile
           messages: [
             {
               role: 'system',

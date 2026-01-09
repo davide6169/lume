@@ -141,12 +141,14 @@ async function runCSVInterestEnrichment() {
     openrouterToken: '{{secrets.openrouter}}',
     enableLinkedIn: true,
     enableInstagram: true,
+    llmModel: 'google/gemma-2-27b-it', // Modello LLM configurabile
     maxCostPerContact: 0.10
   }
 
   console.log('⚙️  CONFIGURAZIONE:')
   console.log('   LinkedIn: enabled')
   console.log('   Instagram: enabled')
+  console.log('   LLM Model: google/gemma-2-27b-it (ottimo per italiano)')
   console.log('   Max cost per contact: $0.10')
   console.log()
 
