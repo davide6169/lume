@@ -121,7 +121,7 @@ export interface BlockMetadata {
   type: string
   name: string
   description: string
-  category: 'input' | 'output' | 'api' | 'ai' | 'transform' | 'filter' | 'branch' | 'merge' | 'custom'
+  category: 'input' | 'output' | 'api' | 'ai' | 'transform' | 'filter' | 'branch' | 'merge' | 'custom' | 'countries'
   version: string
   icon?: string
   configSchema?: any

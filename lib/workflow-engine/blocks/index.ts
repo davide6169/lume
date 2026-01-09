@@ -74,6 +74,15 @@ export {
   FieldMappingBlock
 } from './transform/field-mapping.block'
 
+// Country Blocks
+export {
+  CountryConfigBlock,
+  COUNTRY_CONFIGS,
+  type CountryConfig,
+  type CountryConfigInput,
+  type CountryConfigOutput
+} from './countries/country-config.block'
+
 /**
  * Register all built-in blocks to the registry
  */
@@ -90,6 +99,7 @@ import { InterestInferenceBlock } from './ai/interest-inference.block'
 import { SentimentAnalysisBlock } from './ai/sentiment-analysis.block'
 import { FilterBlock } from './filter/filter.block'
 import { BranchBlock } from './branch/branch.block'
+import { CountryConfigBlock } from './countries/country-config.block'
 
 export function registerAllBuiltInBlocks(): void {
   // API Blocks
@@ -169,6 +179,14 @@ export function registerAllBuiltInBlocks(): void {
     name: 'Branch',
     description: 'Routes data based on conditions',
     category: 'branch',
+    version: '1.0.0'
+  })
+
+  // Country Blocks
+  registerBlock('countries.config', CountryConfigBlock as any, {
+    name: 'Country Configuration',
+    description: 'Automatically detects country and provides country-specific configuration',
+    category: 'countries',
     version: '1.0.0'
   })
 
