@@ -169,7 +169,16 @@ export const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
       metadata: {
         costs: { perContact: 0.003 },
         apifyActor: 'supreme_coder/linkedin-profile-scraper',
-        notes: 'NO LinkedIn cookie required - $3/1000 profiles'
+        notes: 'NO LinkedIn cookie required - $3/1000 profiles',
+        retryPolicy: {
+          maxRetries: 3,
+          initialDelay: 1000,
+          backoffMultiplier: 2
+        },
+        rateLimit: {
+          maxRequests: 100,
+          perMilliseconds: 60000
+        }
       }
     },
 
@@ -200,7 +209,16 @@ export const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
       outputSchema: { type: 'array' },
       metadata: {
         costs: { perContact: 0.050 },
-        apifyActor: 'apify/instagram-scraper'
+        apifyActor: 'apify/instagram-scraper',
+        retryPolicy: {
+          maxRetries: 3,
+          initialDelay: 1000,
+          backoffMultiplier: 2
+        },
+        rateLimit: {
+          maxRequests: 100,
+          perMilliseconds: 60000
+        }
       }
     },
 
