@@ -1,6 +1,6 @@
 {
   "blockType": "csv.interestEnrichment",
-  "description": "Test CSV Interest Enrichment Complete - Marco Montemagno",
+  "description": "Test CSV Interest Enrichment Complete - Marco Montemagno (Instagram ENABLED for testing)",
   "input": {
     "csv": {
       "headers": ["nome", "celular", "email", "nascimento"],
@@ -17,7 +17,7 @@
   "config": {
     "mode": "live",
     "enableLinkedIn": true,
-    "enableInstagram": false,
+    "enableInstagram": true,
     "llmModel": "google/gemma-2-27b-it:free",
     "maxCostPerContact": 0.10
   },

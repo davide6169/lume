@@ -97,9 +97,35 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
         return await this.executeMock(config, input, context, startTime)
       }
 
-      this.log(context, 'info', 'Starting CSV Interest Enrichment', {
-        contactsCount: input.csv.rows.length
+      // 🔍 DEBUG: Log mode and config
+      this.log(context, 'info', '🔍 DEBUG: Starting CSV Interest Enrichment in LIVE mode', {
+        contactsCount: input.csv.rows.length,
+        configMode: config.mode,
+        contextMode: context.mode,
+        hasApifyTokenConfig: !!config.apifyToken,
+        hasOpenrouterTokenConfig: !!config.openrouterToken,
+        hasApifyTokenSecret: !!context.secrets?.APIFY_API_KEY,
+        hasOpenrouterTokenSecret: !!context.secrets?.OPENROUTER_API_KEY
       })
+
+      // Resolve tokens from config or secrets
+      const apifyToken = config.apifyToken || context.secrets?.APIFY_API_KEY || ''
+      const openrouterToken = config.openrouterToken || context.secrets?.OPENROUTER_API_KEY || ''
+
+      this.log(context, 'info', 'Token status', {
+        hasApifyToken: !!apifyToken,
+        hasOpenrouterToken: !!openrouterToken,
+        apifyTokenLength: apifyToken?.length || 0,
+        openrouterTokenLength: openrouterToken?.length || 0
+      })
+
+      // Validate required tokens for live mode
+      if (!apifyToken) {
+        this.log(context, 'warn', '⚠️  No Apify token provided - Instagram/Apify features will be skipped')
+      }
+      if (!openrouterToken) {
+        this.log(context, 'warn', '⚠️  No OpenRouter token provided - LLM interest extraction will be skipped')
+      }
 
       // Validate input
       if (!input.csv || !input.csv.rows || !Array.isArray(input.csv.rows)) {
@@ -144,7 +170,7 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
 
             linkedinData = await this.enrichWithLinkedIn(
               contact,
-              config.apifyToken,
+              apifyToken,
               context
             )
 
@@ -165,7 +191,7 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
             instagramData = await this.searchInstagram(
               contact,
               countryData,
-              config.apifyToken,
+              apifyToken,
               context
             )
 
@@ -190,7 +216,7 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
             const instagramInterests = await this.extractInterestsFromInstagram(
               instagramData,
               countryData,
-              config.openrouterToken,
+              openrouterToken,
               config.llmModel, // ← Passa il modello configurabile
               context
             )
@@ -443,26 +469,29 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
     try {
       this.log(context, 'debug', `Searching Instagram for ${contact.nome}`)
 
-      // NOTA: Qui chiameremmo Apify Instagram Search
-      // Per ora, simuliamo
-
-      // Simulazione: 50% di trovare Instagram
-      const found = Math.random() > 0.5
-
-      if (found) {
-        return {
-          found: true,
-          username: this.generateUsernameFromName(contact.nome),
-          bio: 'Musician | Photographer | Travel lover ✈️',
-          posts: [
-            'Oggi nuova avventura in montagna! 🏔️',
-            'La mia chitarra elettrica è fantastica 🎸',
-            'Fotografando il tramonto a Firenze 📸'
-          ]
-        }
+      // Check if Apify token is available
+      if (!apifyToken || apifyToken.length === 0) {
+        this.log(context, 'warn', `⚠️  Cannot search Instagram: No Apify token provided`)
+        return { found: false, reason: 'No Apify token' }
       }
 
-      return { found: false }
+      // NOTA: Qui chiameremmo Apify Instagram Search
+      // Per ora, simuliamo SEMPRE per testare l'LLM
+
+      this.log(context, 'debug', `🎭 MOCK: Using simulated Instagram data for ${contact.nome}`)
+
+      return {
+        found: true,
+        username: this.generateUsernameFromName(contact.nome),
+        bio: 'Speaker | Autore | Digital Expert | Innovatore | Tech Enthusiast | Divulgatore tecnologico 🚀',
+        posts: [
+          'Parlando di innovazione digitale al Future Festival',
+          'Nuovo libro sulla trasformazione digitale',
+          'Workshop su intelligenza artificiale per le aziende',
+          'Keynote su come la technology sta cambiando il business',
+          'Consulente strategico per la digital transformation'
+        ]
+      }
 
     } catch (error) {
       this.log(context, 'warn', `Instagram search failed`, {
@@ -501,6 +530,12 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
     context: ExecutionContext
   ): Promise<string[]> {
     try {
+      // Check if OpenRouter token is available
+      if (!openrouterToken || openrouterToken.length === 0) {
+        this.log(context, 'warn', `⚠️  Cannot extract interests: No OpenRouter token provided`)
+        return []
+      }
+
       const country = countryData?.code || 'IT'
       const countryName = countryData?.name || 'Italy'
 
@@ -512,12 +547,16 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
         countryName
       )
 
+      this.log(context, 'debug', `Calling OpenRouter API with model: ${llmModel}`)
+
       // Call OpenRouter LLM
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openrouterToken}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://lume.workflow',
+          'X-Title': 'Lume Workflow Engine'
         },
         body: JSON.stringify({
           model: llmModel, // ← Modello configurabile
@@ -537,8 +576,36 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
         })
       })
 
+      // Check response status
+      if (!response.ok) {
+        const errorText = await response.text()
+        this.log(context, 'error', `OpenRouter API error: ${response.status}`, {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText
+        })
+        return []
+      }
+
       const data = await response.json()
+
+      // Debug log the response structure
+      this.log(context, 'debug', `OpenRouter response structure`, {
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length,
+        firstChoiceHasMessage: !!data.choices?.[0]?.message
+      })
+
+      if (!data.choices || data.choices.length === 0) {
+        this.log(context, 'warn', `OpenRouter returned no choices`, {
+          responseKeys: Object.keys(data)
+        })
+        return []
+      }
+
       const content = data.choices[0]?.message?.content || '[]'
+
+      this.log(context, 'debug', `OpenRouter content length: ${content.length}`)
 
       // Parse JSON response
       let interests = JSON.parse(content)
@@ -552,12 +619,17 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
       }
 
       if (Array.isArray(interests)) {
-        return interests.map((i: any) => i.topic || i.interest).slice(0, 10)
+        const extracted = interests.map((i: any) => i.topic || i.interest || i).slice(0, 10)
+        this.log(context, 'debug', `Extracted ${extracted.length} interests from LLM`)
+        return extracted
       }
 
       return []
     } catch (error) {
-      console.error('Failed to extract interests from Instagram:', error)
+      this.log(context, 'error', 'Failed to extract interests from Instagram', {
+        error: (error as Error).message,
+        stack: (error as Error).stack
+      })
       return []
     }
   }
