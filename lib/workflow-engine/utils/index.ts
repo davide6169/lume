@@ -5,6 +5,7 @@
  * - Retry logic with exponential backoff
  * - Rate limiting with token bucket
  * - Circuit breaker pattern
+ * - Cache with TTL and LRU eviction
  */
 
 export {
@@ -34,3 +35,20 @@ export type {
 } from './retry'
 
 export { CircuitState } from './retry'
+
+export {
+  Cache,
+  Caches,
+  createCache,
+  cached,
+  memoize,
+  generateCacheKey,
+  ApiCache,
+  createApiCache
+} from './cache'
+
+export type {
+  CacheEntry,
+  CacheConfig,
+  CacheStats
+} from './cache'
