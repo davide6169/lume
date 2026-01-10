@@ -102,7 +102,26 @@ export const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
           'yahoo.com', 'yahoo.com.br', 'yahoo.com.mx', 'yahoo.com.ar',
           'hotmail.com', 'hotmail.com.br', 'hotmail.com.mx', 'outlook.com',
           'libero.it', 'tin.it', 'virgilio.it', 'alice.it'
-        ]
+        ],
+        emailField: 'email',
+        outputField: 'emailType'
+      },
+      inputSchema: { type: 'array' },
+      outputSchema: { type: 'array' }
+    },
+
+    {
+      id: 'contact-normalize',
+      type: 'transform.contactNormalize',
+      name: 'Normalize Contact Data',
+      description: 'Normalize contact data (names, phones, emails, dates)',
+      config: {
+        nameField: 'nome',
+        firstNameField: 'firstName',
+        lastNameField: 'lastName',
+        phoneField: 'celular',
+        emailField: 'email',
+        birthDateField: 'nascimento'
       },
       inputSchema: { type: 'array' },
       outputSchema: { type: 'array' }
@@ -276,9 +295,11 @@ export const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
     // Layer 0 → Layer 1
     { id: 'e1', source: 'csv-parse', target: 'country-detect' },
     { id: 'e2', source: 'csv-parse', target: 'email-classify' },
+    { id: 'e2b', source: 'csv-parse', target: 'contact-normalize' },
 
     // Layer 1 → Layer 2
     { id: 'e3', source: 'email-classify', target: 'branch-email-type' },
+    { id: 'e3b', source: 'contact-normalize', target: 'branch-email-type' },
 
     // Layer 2 → Layer 3 (Branch)
     { id: 'e4', source: 'branch-email-type', target: 'linkedin-search', sourcePort: 'true' },

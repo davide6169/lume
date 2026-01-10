@@ -69,6 +69,13 @@ export {
 } from './filter/filter.block'
 
 export {
+  HasBioDataFilterBlock,
+  type HasBioDataFilterConfig,
+  type HasBioDataFilterInput,
+  type HasBioDataFilterOutput
+} from './filter/has-bio-data.block'
+
+export {
   BranchBlock,
   type BranchConfig
 } from './branch/branch.block'
@@ -87,6 +94,20 @@ export {
 export {
   FieldMappingBlock
 } from './transform/field-mapping.block'
+
+export {
+  EmailClassifierBlock,
+  type EmailClassifierConfig,
+  type EmailClassifierInput,
+  type EmailClassifierOutput
+} from './transform/email-classifier.block'
+
+export {
+  ContactNormalizerBlock,
+  type ContactNormalizerConfig,
+  type ContactNormalizerInput,
+  type ContactNormalizerOutput
+} from './transform/contact-normalizer.block'
 
 // Country Blocks
 export {
@@ -145,7 +166,10 @@ import { ContactExtractionBlock } from './ai/contact-extraction.block'
 import { InterestInferenceBlock } from './ai/interest-inference.block'
 import { SentimentAnalysisBlock } from './ai/sentiment-analysis.block'
 import { FilterBlock } from './filter/filter.block'
+import { HasBioDataFilterBlock } from './filter/has-bio-data.block'
 import { BranchBlock } from './branch/branch.block'
+import { EmailClassifierBlock } from './transform/email-classifier.block'
+import { ContactNormalizerBlock } from './transform/contact-normalizer.block'
 import { CountryConfigBlock } from './countries/country-config.block'
 import { LeadEnrichmentBlock } from './enrichment/lead-enrichment.block'
 import { CSVInterestEnrichmentBlock } from './csv/csv-interest-enrichment.block'
@@ -244,6 +268,28 @@ export function registerAllBuiltInBlocks(): void {
     name: 'Branch',
     description: 'Routes data based on conditions',
     category: 'branch',
+    version: '1.0.0'
+  })
+
+  registerBlock('filter.hasBioData', HasBioDataFilterBlock as any, {
+    name: 'Has Bio Data Filter',
+    description: 'Filters contacts that have bio data from LinkedIn or Instagram. Routes contacts with bio to interest inference, others to assembler.',
+    category: 'filter',
+    version: '1.0.0'
+  })
+
+  // Transform Blocks
+  registerBlock('transform.emailClassify', EmailClassifierBlock as any, {
+    name: 'Email Classifier',
+    description: 'Classifies email addresses as business or personal based on domain. Uses configurable personal domains list.',
+    category: 'transform',
+    version: '1.0.0'
+  })
+
+  registerBlock('transform.contactNormalize', ContactNormalizerBlock as any, {
+    name: 'Contact Normalizer',
+    description: 'Normalizes contact data by extracting name parts, cleaning phone numbers, and standardizing email and date formats.',
+    category: 'transform',
     version: '1.0.0'
   })
 
