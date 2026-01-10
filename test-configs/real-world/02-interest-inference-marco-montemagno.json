@@ -1,0 +1,44 @@
+{
+  "blockType": "ai.interestInference",
+  "description": "Test AI Interest Inference - Marco Montemagno (marco@montemagno.com)",
+  "input": {},
+  "config": {
+    "mode": "live",
+    "model": "google/gemma-2-27b-it:free",
+    "maxInterests": 10,
+    "data": [
+      {
+        "name": "Marco Montemagno",
+        "country": "IT",
+        "birthDate": "1974-01-01",
+        "bio": "Speaker, Autore, Digital Expert, Innovatore, Tech Enthusiast, Divulgatore tecnologico",
+        "posts": [
+          "Parlando di innovazione digitale al Future Festival",
+          "Nuovo libro sulla trasformazione digitale",
+          "Workshop su intelligenza artificiale per le aziende",
+          "Keynote su come il technology sta cambiando il business",
+          "Consulente strategico per la digital transformation"
+        ]
+      }
+    ]
+  },
+  "secrets": {
+    "OPENROUTER_API_KEY": "$OPENROUTER_API_KEY"
+  },
+  "expectedOutputSchema": {
+    "results": [
+      {
+        "name": "string",
+        "interests": [
+          {
+            "topic": "string",
+            "confidence": "number",
+            "category": "string"
+          }
+        ],
+        "interestsInferred": "boolean",
+        "inferredAt": "string"
+      }
+    ]
+  }
+}

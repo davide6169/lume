@@ -1,0 +1,18 @@
+{
+  "description": "Test Country Detection - Marco Montemagno (marco@montemagno.com)",
+  "contact": {
+    "name": "Marco Montemagno",
+    "email": "marco@montemagno.com",
+    "phone": "",
+    "birthDate": ""
+  },
+  "config": {
+    "mode": "live"
+  },
+  "expected": {
+    "country": "IT",
+    "countryName": "Italy",
+    "language": "it",
+    "confidence": "high"
+  }
+}

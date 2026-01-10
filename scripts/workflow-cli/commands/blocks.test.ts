@@ -3,12 +3,16 @@
  * Test a block
  */
 
+import dotenv from 'dotenv'
 import { logger } from '../utils/logger'
-import { configLoader, secretsManager } from '../utils/config-loader'
+import { configLoader } from '../utils/config-loader'
 import { blockRegistry, createBlockExecutor } from '../../../lib/workflow-engine'
 import { ContextFactory } from '../../../lib/workflow-engine/context'
 import { registerAllBuiltInBlocks } from '../../../lib/workflow-engine/blocks'
 import { readStdin } from '../utils/stdin'
+
+// Load environment variables
+dotenv.config({ path: '.env.local' })
 
 export async function registerBlocksTestCommand(options: {
   type?: string
@@ -27,8 +31,9 @@ export async function registerBlocksTestCommand(options: {
 
   // Validate mode
   const validModes = ['live', 'mock', 'demo', 'test', 'production']
-  const mode = (options.mode || 'test') as 'production' | 'demo' | 'test'
-  if (!validModes.includes(mode) && mode !== 'production') {
+  const mode = options.mode || 'test'
+
+  if (!validModes.includes(mode)) {
     logger.error(`Invalid mode: ${mode}. Valid modes: ${validModes.join(', ')}`)
     process.exit(1)
   }
@@ -147,7 +152,22 @@ export async function registerBlocksTestCommand(options: {
     if (executionMode === 'production') {
       logger.info('')
       logger.info('Loading secrets from environment...')
-      secrets = await secretsManager.getDefaultSecrets()
+
+      // Load secrets directly from environment
+      secrets = {
+        APOLLO_API_KEY: process.env.APOLLO_API_KEY || '',
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        APIFY_API_KEY: process.env.APIFY_API_KEY || '',
+        HUNTER_IO_API_KEY: process.env.HUNTER_IO_API_KEY || '',
+        MIXEDBREAD_API_KEY: process.env.MIXEDBREAD_API_KEY || ''
+      }
+
+      // Filter empty secrets
+      secrets = Object.fromEntries(
+        Object.entries(secrets).filter(([_, value]) => value && value.length > 0)
+      ) as Record<string, string>
+
+      logger.info(`Loaded ${Object.keys(secrets).length} secrets from environment`)
     } else {
       logger.info('')
       logger.info('Mock mode: No secrets required 🎭')

@@ -1,0 +1,46 @@
+{
+  "blockType": "csv.interestEnrichment",
+  "description": "Test CSV Interest Enrichment Complete - Marco Montemagno",
+  "input": {
+    "csv": {
+      "headers": ["nome", "celular", "email", "nascimento"],
+      "rows": [
+        {
+          "nome": "Marco Montemagno",
+          "celular": "",
+          "email": "marco@montemagno.com",
+          "nascimento": "1974-01-01"
+        }
+      ]
+    }
+  },
+  "config": {
+    "mode": "live",
+    "enableLinkedIn": true,
+    "enableInstagram": false,
+    "llmModel": "google/gemma-2-27b-it:free",
+    "maxCostPerContact": 0.10
+  },
+  "secrets": {},
+  "expectedOutputSchema": {
+    "csv": {
+      "headers": ["string[]"],
+      "rows": [
+        {
+          "nome": "string",
+          "celular": "string",
+          "email": "string",
+          "nascimento": "string",
+          "interessi": "string"
+        }
+      ]
+    },
+    "metadata": {
+      "totalContacts": "number",
+      "contactsWithInterests": "number",
+      "countryDetected": "number",
+      "linkedinFound": "number",
+      "totalCost": "number"
+    }
+  }
+}

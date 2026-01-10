@@ -172,3 +172,5 @@ coverage/
 .node_repl_history
 *.tgz
 .pnpm-store
+enriched-contacts.csv
+test-configs/real-world/*.json

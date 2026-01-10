@@ -1,0 +1,28 @@
+{
+  "blockType": "api.apollo",
+  "description": "Test Apollo Enrichment - Marco Montemagno (marco@montemagno.com)",
+  "input": {
+    "contacts": [
+      {
+        "email": "marco@montemagno.com"
+      }
+    ]
+  },
+  "config": {
+    "mode": "live",
+    "apiKey": "{{secrets.APOLLO_API_KEY}}"
+  },
+  "secrets": {},
+  "expectedOutputSchema": {
+    "enriched": true,
+    "contacts": [
+      {
+        "email": "string",
+        "linkedinUrl": "string",
+        "title": "string",
+        "company": "string",
+        "location": "string"
+      }
+    ]
+  }
+}
