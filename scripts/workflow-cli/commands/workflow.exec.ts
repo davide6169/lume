@@ -9,6 +9,7 @@ import { WorkflowOrchestrator } from '../../../lib/workflow-engine/orchestrator'
 import { ContextFactory } from '../../../lib/workflow-engine/context'
 import { WorkflowService } from '../../../lib/workflow-engine/database/workflow.service'
 import { registerAllBuiltInBlocks } from '../../../lib/workflow-engine/blocks'
+import { readStdin } from '../utils/stdin'
 
 export async function registerExecCommand(options: {
   id?: string
@@ -62,6 +63,31 @@ export async function registerExecCommand(options: {
     } else if (options.input) {
       logger.info('Using inline input')
       input = JSON.parse(options.input)
+    } else {
+      // Check if input is coming from stdin
+      if (process.stdin.isTTY) {
+        // No stdin, no file, no inline input
+        logger.info('No input provided (using empty object)')
+        logger.info('Provide input via:')
+        logger.info('  --input <json>    - Inline JSON string')
+        logger.info('  --file <path>     - Configuration file')
+        logger.info('  echo "<json>" | workflow exec --id <id>  - From stdin')
+        logger.info('  cat file.json | workflow exec --id <id>  - From stdin pipe')
+        input = {}
+      } else {
+        // Read from stdin
+        logger.info('Reading input from stdin...')
+        const stdinData = await readStdin()
+        try {
+          input = JSON.parse(stdinData)
+          logger.success('Loaded input from stdin')
+        } catch (parseError) {
+          logger.error('Failed to parse stdin as JSON')
+          logger.debug('Stdin content:', stdinData)
+          logger.info('Tip: Ensure stdin contains valid JSON')
+          process.exit(1)
+        }
+      }
     }
 
     // Load secrets based on mode

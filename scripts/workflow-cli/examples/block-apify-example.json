@@ -1,0 +1,10 @@
+{
+  "description": "Test Apify Instagram scraper",
+  "input": {
+    "url": "https://instagram.com/p/ABC123"
+  },
+  "config": {
+    "platform": "instagram",
+    "limit": 50
+  }
+}

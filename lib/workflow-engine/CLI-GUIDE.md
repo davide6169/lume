@@ -86,11 +86,17 @@ npm run workflow -- exec --id my-workflow
 # Execute with production APIs
 npm run workflow -- exec --id my-workflow --mode live
 
-# Execute with input data
+# Execute with input data (inline JSON)
 npm run workflow -- exec --id my-workflow --input '{"url": "https://instagram.com/p/ABC123"}'
 
 # Execute with test config file
 npm run workflow -- exec --id my-workflow --file test-config.json
+
+# Execute with input from stdin (NEW!)
+echo '{"url": "https://instagram.com/p/ABC123"}' | npm run workflow -- exec --id my-workflow
+
+# Execute with input from file via stdin
+cat workflow-input.json | npm run workflow -- exec --id my-workflow
 
 # Execute with progress bar
 npm run workflow -- exec --id my-workflow --mode demo --watch
@@ -110,6 +116,7 @@ npm run workflow -- exec --id my-workflow --mode demo --json
   - `test` - Deterministic mock data
 - `-w, --watch` - Show progress bar
 - `-j, --json` - Output as JSON
+- `--stdin` - Read input from stdin (implicit when piped)
 
 **Execution Modes:**
 
@@ -343,7 +350,73 @@ npm run workflow -- exec \
 
 ---
 
-### Example 4: Test AI Block
+### Example 4: Using Stdin (NEW!)
+
+**Scenario:** Execute workflow with input from stdin
+
+#### 4a. Pipe from echo
+
+```bash
+echo '{"url": "https://instagram.com/p/ABC123", "limit": 50}' | \
+  npm run workflow -- exec --id instagram-sentiment --mode demo --watch
+```
+
+#### 4b. Pipe from file
+
+```bash
+cat workflow-input.json | npm run workflow -- exec --id instagram-sentiment
+```
+
+**workflow-input.json:**
+```json
+{
+  "input": {
+    "url": "https://instagram.com/p/ABC123",
+    "platform": "instagram",
+    "limit": 50
+  }
+}
+```
+
+#### 4c. Pipe from curl
+
+```bash
+# Fetch data from API and process with workflow
+curl -s https://api.example.com/data | \
+  npm run workflow -- exec --id my-workflow --mode demo
+```
+
+#### 4d. Pipe from command output
+
+```bash
+# Generate data with script and process
+node generate-data.js | npm run workflow -- exec --id my-workflow
+```
+
+#### 4e. Test Block with Stdin
+
+```bash
+# Test Apify block with config from stdin
+cat block-apify.json | npm run workflow -- blocks test --type api.apify --mode demo
+```
+
+**block-apify.json:**
+```json
+{
+  "description": "Test Apify Instagram scraper",
+  "input": {
+    "url": "https://instagram.com/p/ABC123"
+  },
+  "config": {
+    "platform": "instagram",
+    "limit": 50
+  }
+}
+```
+
+---
+
+### Example 5: Test AI Block
 
 **Scenario:** Test sentiment analysis block
 

@@ -8,6 +8,7 @@ import { configLoader, secretsManager } from '../utils/config-loader'
 import { blockRegistry, createBlockExecutor } from '../../../lib/workflow-engine'
 import { ContextFactory } from '../../../lib/workflow-engine/context'
 import { registerAllBuiltInBlocks } from '../../../lib/workflow-engine/blocks'
+import { readStdin } from '../utils/stdin'
 
 export async function registerBlocksTestCommand(options: {
   type?: string
@@ -64,10 +65,30 @@ export async function registerBlocksTestCommand(options: {
       logger.info(`Loading test configuration: ${options.config}`)
       testConfig = await configLoader.loadTestConfig(options.config)
     } else {
-      logger.error('Must provide either --config or --use-baseline')
-      logger.info('Example: workflow blocks test --type api.apify --config test-config.json')
-      logger.info('Or use baseline: workflow blocks test --type api.apify --use-baseline')
-      process.exit(1)
+      // Check if input is coming from stdin
+      if (process.stdin.isTTY) {
+        // No stdin, no file, no baseline
+        logger.error('Must provide --config, --use-baseline, or pipe configuration via stdin')
+        logger.info('Examples:')
+        logger.info('  workflow blocks test --type api.apify --config test.json')
+        logger.info('  workflow blocks test --type api.apify --use-baseline')
+        logger.info('  echo \'{"input":{...}}\' | workflow blocks test --type api.apify')
+        logger.info('  cat test.json | workflow blocks test --type api.apify')
+        process.exit(1)
+      } else {
+        // Read from stdin
+        logger.info('Reading configuration from stdin...')
+        const stdinData = await readStdin()
+        try {
+          testConfig = JSON.parse(stdinData)
+          logger.success('Loaded configuration from stdin')
+        } catch (parseError) {
+          logger.error('Failed to parse stdin as JSON')
+          logger.debug('Stdin content:', stdinData)
+          logger.info('Tip: Ensure stdin contains valid JSON with input and config')
+          process.exit(1)
+        }
+      }
     }
 
     console.log('')

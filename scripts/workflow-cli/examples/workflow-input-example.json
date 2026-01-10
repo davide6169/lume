@@ -1,0 +1,7 @@
+{
+  "input": {
+    "url": "https://instagram.com/p/ABC123",
+    "platform": "instagram",
+    "limit": 50
+  }
+}
