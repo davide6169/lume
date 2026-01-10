@@ -52,8 +52,8 @@ export async function registerExecCommand(options: {
     // Load configuration
     if (options.useBaseline) {
       logger.info('Loading baseline configuration...')
-      // TODO: Load baseline config
-      logger.warn('Baseline loading not yet implemented, using defaults')
+      // TODO: Load baseline config for workflow
+      logger.warn('Baseline loading not yet implemented for workflows, using defaults')
     } else if (options.file) {
       logger.info(`Loading test configuration: ${options.file}`)
       const testConfig = await configLoader.loadTestConfig(options.file)
@@ -65,15 +65,29 @@ export async function registerExecCommand(options: {
       input = JSON.parse(options.input)
     } else {
       // Check if input is coming from stdin
-      if (process.stdin.isTTY) {
+      // isTTY is false when piped, true/undefined when not piped
+      const hasStdin = process.stdin.isTTY === false
+
+      if (!hasStdin) {
         // No stdin, no file, no inline input
-        logger.info('No input provided (using empty object)')
-        logger.info('Provide input via:')
-        logger.info('  --input <json>    - Inline JSON string')
-        logger.info('  --file <path>     - Configuration file')
-        logger.info('  echo "<json>" | workflow exec --id <id>  - From stdin')
-        logger.info('  cat file.json | workflow exec --id <id>  - From stdin pipe')
-        input = {}
+
+        // 🎯 SMART FEATURE: In demo mode, use empty input with friendly message
+        if (executionMode === 'demo') {
+          logger.info('Demo mode: No input specified, using empty input')
+          logger.info('💡 Tip: You can provide input via:')
+          logger.info('  --input <json>    - Inline JSON string')
+          logger.info('  --file <path>     - Configuration file')
+          logger.info('  --use-baseline    - Load baseline configuration (when available)')
+          input = {}
+        } else {
+          // Test/live mode: warn about missing input
+          logger.warn('No input provided (using empty object)')
+          logger.info('For production, consider providing input:')
+          logger.info('  --input <json>    - Inline JSON string')
+          logger.info('  --file <path>     - Configuration file')
+          logger.info('  echo "<json>" | workflow exec --id <id>  - From stdin')
+          input = {}
+        }
       } else {
         // Read from stdin
         logger.info('Reading input from stdin...')

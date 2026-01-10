@@ -66,15 +66,41 @@ export async function registerBlocksTestCommand(options: {
       testConfig = await configLoader.loadTestConfig(options.config)
     } else {
       // Check if input is coming from stdin
-      if (process.stdin.isTTY) {
-        // No stdin, no file, no baseline
-        logger.error('Must provide --config, --use-baseline, or pipe configuration via stdin')
-        logger.info('Examples:')
-        logger.info('  workflow blocks test --type api.apify --config test.json')
-        logger.info('  workflow blocks test --type api.apify --use-baseline')
-        logger.info('  echo \'{"input":{...}}\' | workflow blocks test --type api.apify')
-        logger.info('  cat test.json | workflow blocks test --type api.apify')
-        process.exit(1)
+      // isTTY is false when piped, true/undefined when not piped
+      const hasStdin = process.stdin.isTTY === false
+
+      if (!hasStdin) {
+        // No stdin, no file specified
+
+        // 🎯 SMART FEATURE: In demo mode, auto-load baseline if not specified
+        if (executionMode === 'demo') {
+          logger.info('Demo mode: No config specified, auto-loading baseline configuration...')
+          const baselineDir = configLoader.getBaselineDir()
+          try {
+            testConfig = await configLoader.loadBaselineConfig(options.type, baselineDir)
+            logger.success('Auto-loaded baseline configuration for demo ✨')
+          } catch (baselineError) {
+            logger.error('Failed to load baseline configuration')
+            logger.info('Make sure the baseline file exists:')
+            logger.info(`  test-configs/baseline/${options.type}.baseline.json`)
+            logger.info('')
+            logger.info('Alternatively, provide:')
+            logger.info('  --config <path>    - Custom configuration file')
+            logger.info('  echo \'{"input":{...}}\' | workflow blocks test --type <type>')
+            process.exit(1)
+          }
+        } else {
+          // Test/live mode: require explicit config
+          logger.error('Must provide --config, --use-baseline, or pipe configuration via stdin')
+          logger.info('Examples:')
+          logger.info('  workflow blocks test --type api.apify --config test.json')
+          logger.info('  workflow blocks test --type api.apify --use-baseline')
+          logger.info('  echo \'{"input":{...}}\' | workflow blocks test --type api.apify')
+          logger.info('  cat test.json | workflow blocks test --type api.apify')
+          logger.info('')
+          logger.info('💡 Tip: Use --mode demo for auto-loading baseline configuration')
+          process.exit(1)
+        }
       } else {
         // Read from stdin
         logger.info('Reading configuration from stdin...')
