@@ -108,7 +108,7 @@ async function runCSVInterestEnrichment() {
   // Create context
   const context = ContextFactory.create({
     workflowId: 'csv-interest-enrichment',
-    mode: 'demo',
+    mode: 'demo', // Use demo mode for mock execution
     secrets: {
       apify: process.env.APIFY_TOKEN || 'your-apify-token',
       openrouter: process.env.OPENROUTER_API_KEY || 'your-openrouter-token'
@@ -137,8 +137,7 @@ async function runCSVInterestEnrichment() {
 
   // Config
   const config = {
-    apifyToken: '{{secrets.apify}}',
-    openrouterToken: '{{secrets.openrouter}}',
+    mode: 'mock' as const, // Use mock mode for demo
     enableLinkedIn: true,
     enableInstagram: true,
     llmModel: 'google/gemma-2-27b-it', // Modello LLM configurabile
@@ -146,10 +145,12 @@ async function runCSVInterestEnrichment() {
   }
 
   console.log('⚙️  CONFIGURAZIONE:')
+  console.log('   Mode: MOCK 🎭 (demo mode, no API calls)')
   console.log('   LinkedIn: enabled')
   console.log('   Instagram: enabled')
   console.log('   LLM Model: google/gemma-2-27b-it (ottimo per italiano)')
   console.log('   Max cost per contact: $0.10')
+  console.log('   └─ In mock mode: API keys not required')
   console.log()
 
   // Execute enrichment
@@ -200,7 +201,7 @@ async function runCSVInterestEnrichment() {
       console.log(`   Phone: ${row.celular}`)
       console.log(`   Nascita: ${row.nascimento || 'N/A'}`)
 
-      if (row.interessi && row.interesti.length > 0) {
+      if (row.interessi && row.interessi.length > 0) {
         console.log(`   ✅ Interessi: ${row.interessi}`)
       } else {
         console.log(`   ⚠️  Interessi: (non disponibili - nessun profilo social trovato)`)

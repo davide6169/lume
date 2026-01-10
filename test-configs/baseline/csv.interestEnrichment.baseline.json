@@ -1,16 +1,66 @@
 {
   "blockType": "csv.interestEnrichment",
-  "description": "Baseline test config for CSV Interest Enrichment block",
+  "description": "Test CSV Interest Enrichment block - Italian contacts with interests inference",
   "version": "1.0.0",
-  "generatedAt": "2026-01-10T08:02:30.104Z",
-  "input": {},
-  "config": {},
-  "secrets": {
-    "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
-    "APOLLO_API_KEY": "${APOLLO_API_KEY}",
-    "HUNTER_IO_API_KEY": "${HUNTER_IO_API_KEY}",
-    "FACEBOOK_ACCESS_TOKEN": "${FACEBOOK_ACCESS_TOKEN}",
-    "INSTAGRAM_ACCESS_TOKEN": "${INSTAGRAM_ACCESS_TOKEN}"
+  "generatedAt": "2026-01-10T10:00:00.000Z",
+  "input": {
+    "csv": {
+      "headers": ["nome", "celular", "email", "nascimento"],
+      "rows": [
+        {
+          "nome": "Mario Rossi",
+          "celular": "3291234567",
+          "email": "mario.rossi@mydomain.com",
+          "nascimento": "21/02/1986"
+        },
+        {
+          "nome": "Luca Bianchi",
+          "celular": "3282345678",
+          "email": "luca.bianchi@mydomain.com",
+          "nascimento": "27/01/1983"
+        },
+        {
+          "nome": "Giuseppe Verdi",
+          "celular": "3273456789",
+          "email": "giuseppe.verdi@mydomain.com",
+          "nascimento": ""
+        }
+      ]
+    }
   },
-  "expectedOutputSchema": {}
+  "config": {
+    "mode": "mock",
+    "enableLinkedIn": true,
+    "enableInstagram": true,
+    "llmModel": "google/gemma-2-27b-it",
+    "maxCostPerContact": 0.10
+  },
+  "variables": {},
+  "secrets": {},
+  "expectedOutputSchema": {
+    "csv": {
+      "headers": ["string[]"],
+      "rows": [
+        {
+          "nome": "string",
+          "celular": "string",
+          "email": "string",
+          "nascimento": "string",
+          "interessi": "string"
+        }
+      ]
+    },
+    "metadata": {
+      "totalContacts": "number",
+      "contactsWithInterests": "number",
+      "contactsWithoutInterests": "number",
+      "filteredContacts": "number",
+      "outputRecords": "number",
+      "countryDetected": "number",
+      "linkedinFound": "number",
+      "instagramFound": "number",
+      "totalCost": "number",
+      "avgCostPerContact": "number"
+    }
+  }
 }

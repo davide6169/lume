@@ -36,8 +36,9 @@ export interface CSVInterestEnrichmentInput {
 }
 
 export interface CSVInterestEnrichmentConfig {
-  apifyToken: string // {{secrets.apify}}
-  openrouterToken: string // {{secrets.openrouter}}
+  mode?: 'live' | 'mock' // Execution mode: mock = demo/test, live = real APIs
+  apifyToken?: string // {{secrets.apify}} - Only required in live mode
+  openrouterToken?: string // {{secrets.openrouter}} - Only required in live mode
   enableLinkedIn?: boolean // Default: true
   enableInstagram?: boolean // Default: true
   llmModel?: string // Default: "google/gemma-2-27b-it" (ottimo per italiano)
@@ -85,6 +86,17 @@ export class CSVInterestEnrichmentBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
+      // Check if should run in mock mode
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating CSV Interest Enrichment', {
+          contactsCount: input.csv.rows.length,
+          mode: context.mode
+        })
+        return await this.executeMock(config, input, context, startTime)
+      }
+
       this.log(context, 'info', 'Starting CSV Interest Enrichment', {
         contactsCount: input.csv.rows.length
       })
@@ -609,5 +621,189 @@ Regole:
     const specific = filtered.filter(i => !generic.includes(i.toLowerCase()))
 
     return specific.slice(0, 10) // Max 10 interests
+  }
+
+  // ============================================================
+  // MOCK MODE: Deterministic simulation for demo/test
+  // ============================================================
+
+  /**
+   * Execute in mock mode - deterministic, no API calls
+   */
+  private async executeMock(
+    config: CSVInterestEnrichmentConfig,
+    input: CSVInterestEnrichmentInput,
+    context: ExecutionContext,
+    startTime: number
+  ) {
+    const contacts = input.csv.rows
+    const enrichedRows: any[] = []
+
+    // Statistics
+    let contactsWithInterests = 0
+    let contactsWithoutInterests = 0
+    let countryDetected = 0
+    let linkedinFound = 0
+    let instagramFound = 0
+    const totalCost = 0
+
+    this.log(context, 'info', '🎭 Mock: Processing contacts without API calls')
+
+    // Process each contact with deterministic mock data
+    for (let i = 0; i < contacts.length; i++) {
+      const contact = contacts[i]
+      this.log(context, 'debug', `🎭 Mock: Processing contact ${i + 1}/${contacts.length}`)
+
+      const enrichedRow = { ...contact }
+
+      // Deterministic: 80% have country detected
+      if (i < Math.ceil(contacts.length * 0.8)) {
+        countryDetected++
+      }
+
+      // Deterministic: 35% have LinkedIn (business emails only)
+      const emailType = this.classifyEmail(contact.email)
+      const hasLinkedIn = emailType === 'business' && i < Math.ceil(contacts.length * 0.35)
+
+      if (hasLinkedIn) {
+        linkedinFound++
+      }
+
+      // Deterministic: 50% have Instagram
+      const hasInstagram = i < Math.ceil(contacts.length * 0.5)
+      if (hasInstagram) {
+        instagramFound++
+      }
+
+      // Generate interests deterministically based on index
+      if (hasLinkedIn || hasInstagram) {
+        const mockInterests = this.generateMockInterests(i, contact.nome)
+        enrichedRow.interessi = mockInterests.join(', ')
+        contactsWithInterests++
+
+        this.log(context, 'debug', `🎭 Mock: Generated ${mockInterests.length} interests for ${contact.nome}`)
+      } else {
+        enrichedRow.interessi = ''
+        contactsWithoutInterests++
+
+        this.log(context, 'debug', `🎭 Mock: No bio data found for ${contact.nome}`)
+      }
+
+      enrichedRow.enrichment_cost = 0
+      enrichedRows.push(enrichedRow)
+
+      // Update progress
+      const progress = Math.round(((i + 1) / contacts.length) * 100)
+      context.updateProgress(progress, {
+        timestamp: new Date().toISOString(),
+        event: 'enrichment_progress',
+        details: {
+          processed: i + 1,
+          total: contacts.length,
+          contactsWithInterests,
+          contactsWithoutInterests,
+          countryDetected,
+          linkedinFound,
+          instagramFound,
+          totalCost: '0.0000'
+        }
+      })
+
+      // Simulate processing delay
+      await this.sleep(50 + Math.random() * 100)
+    }
+
+    // Filter: only rows with interests
+    const rowsWithInterests = enrichedRows.filter(row => row.interessi && row.interessi.trim().length > 0)
+
+    const output: CSVInterestEnrichmentOutput = {
+      csv: {
+        headers: [...input.csv.headers, 'interessi'],
+        rows: rowsWithInterests
+      },
+      metadata: {
+        totalContacts: contacts.length,
+        contactsWithInterests,
+        contactsWithoutInterests,
+        filteredContacts: enrichedRows.length - rowsWithInterests.length,
+        outputRecords: rowsWithInterests.length,
+        countryDetected,
+        linkedinFound,
+        instagramFound,
+        totalCost,
+        avgCostPerContact: 0
+      }
+    }
+
+    const executionTime = Date.now() - startTime
+
+    this.log(context, 'info', '🎭 Mock: CSV Interest Enrichment completed', {
+      executionTime,
+      totalContacts: contacts.length,
+      contactsWithInterests,
+      contactsWithoutInterests,
+      filteredContacts: enrichedRows.length - rowsWithInterests.length,
+      outputRecords: rowsWithInterests.length,
+      totalCost: '0.0000',
+      avgCostPerContact: '0.0000'
+    })
+
+    return {
+      status: 'completed',
+      output,
+      executionTime,
+      error: undefined,
+      retryCount: 0,
+      startTime,
+      endTime: Date.now(),
+      metadata: { ...output.metadata, mock: true },
+      logs: []
+    }
+  }
+
+  /**
+   * Generate mock interests deterministically
+   */
+  private generateMockInterests(index: number, nome: string): string[] {
+    // Italian interests organized by category
+    const italianInterests = {
+      sports: ['calcio', 'ciclismo', 'motociclismo', 'pallavolo', 'rugby', 'tennis', 'nuoto', 'sci'],
+      music: ['chitarra elettrica', 'pianoforte', 'musica classica', 'opera lirica', 'rock italiano', 'jazz', 'musica elettronica'],
+      arts: ['fotografia', 'pittura', 'scultura', 'arte contemporanea', 'cinema italiano', 'teatro', 'letteratura', 'poesia'],
+      food: ['cucina italiana', 'vino', 'pizza fatta in casa', 'cucina regionale', 'enogastronomia', 'pasticceria'],
+      travel: ['viaggi in Italia', 'escursionismo montagna', 'mare Italia', 'città d\'arte', 'turismo culturale'],
+      tech: ['tecnologia', 'sviluppo software', 'fotografia digitale', 'smart home', 'gaming', 'robotica']
+    }
+
+    // Deterministic selection based on index
+    const categories = Object.keys(italianInterests)
+    const selectedCategories: string[] = []
+
+    // Select 2-3 categories based on index
+    const numCategories = 2 + (index % 2)
+    for (let j = 0; j < numCategories; j++) {
+      const catIndex = (index + j) % categories.length
+      selectedCategories.push(categories[catIndex])
+    }
+
+    // Select 1-2 interests from each category
+    const interests: string[] = []
+    selectedCategories.forEach(category => {
+      const categoryInterests = italianInterests[category as keyof typeof italianInterests]
+      const numInterests = 1 + ((index + category.length) % 2)
+      for (let k = 0; k < numInterests; k++) {
+        const interestIndex = (index + k) % categoryInterests.length
+        interests.push(categoryInterests[interestIndex])
+      }
+    })
+
+    return interests.slice(0, 6) // Max 6 interests
+  }
+
+  /**
+   * Sleep helper for mock delays
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
   }
 }
