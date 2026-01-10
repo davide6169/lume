@@ -14,12 +14,12 @@ import { ApolloEnrichmentService } from '@/lib/services/apollo-enrichment'
 import { MockDataGenerator } from '../../utils/mock-data-generator'
 
 export interface ApolloEnrichmentConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.apollo}}
   contacts: Contact[] // {{input.contacts}}
   revealPersonalEmails?: boolean // Default: true
   revealPhoneNumbers?: boolean // Default: true
   batchSize?: number // Default: 10 (max)
-  mock?: boolean // Enable mock mode for testing
 }
 
 /**
@@ -38,9 +38,11 @@ export class ApolloEnrichmentBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing Apollo Enrichment block', {
-        contactsCount: config.contacts?.length || 0,
-        mock: config.mock || false
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      this.log(context, 'info', `Executing Apollo Enrichment block in ${shouldMock ? 'MOCK' : 'LIVE'} mode`, {
+        contactsCount: config.contacts?.length || 0
       })
 
       // Validate config
@@ -48,9 +50,9 @@ export class ApolloEnrichmentBlock extends BaseBlockExecutor {
         throw new Error('Contacts array is required')
       }
 
-      // Mock mode - skip API calls
-      if (config.mock) {
-        this.log(context, 'info', '🧪 MOCK MODE: Simulating Apollo enrichment without API calls')
+      // 🎭 MOCK MODE - skip API calls
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating Apollo enrichment without API calls')
 
         // Simulate API latency
         await MockDataGenerator.simulateLatency(200, 800)
@@ -79,7 +81,7 @@ export class ApolloEnrichmentBlock extends BaseBlockExecutor {
         }
       }
 
-      // Real API mode
+      // LIVE MODE - Real API calls
       if (!config.apiToken) {
         throw new Error('Apollo API token is required (unless using mock mode)')
       }

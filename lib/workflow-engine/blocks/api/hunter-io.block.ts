@@ -10,12 +10,14 @@ import type { ExecutionContext } from '../../types'
 
 // Import the existing service
 import { HunterIoService } from '@/lib/services/hunter-io'
+import { MockDataGenerator } from '../../utils/mock-data-generator'
 
 // ============================================
 // Email Finder Block
 // ============================================
 
 export interface HunterEmailFinderConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.hunter}}
   contacts: Array<{
     firstName?: string
@@ -43,15 +45,55 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
 
     try {
       this.log(context, 'info', 'Executing Hunter Email Finder block', {
-        contactsCount: config.contacts?.length || 0
+        contactsCount: config.contacts?.length || 0,
+        mock: config.mock || false
       })
 
       // Validate config
-      if (!config.apiToken) {
-        throw new Error('Hunter API token is required')
-      }
       if (!config.contacts || !Array.isArray(config.contacts)) {
         throw new Error('Contacts array is required')
+      }
+
+      // Mock mode
+      if (config.mock) {
+        this.log(context, 'info', '🧪 MOCK MODE: Simulating Hunter Email Finder')
+
+        await MockDataGenerator.simulateLatency(150, 500)
+
+        const results = config.contacts.map(contact => {
+          // Skip if already has email
+          if ('email' in contact && contact.email) {
+            return contact
+          }
+          // Generate mock email
+          const domain = contact.domain || contact.company?.toLowerCase().replace(/\s+/g, '') || 'example.com'
+          return {
+            ...contact,
+            email: `${(contact.firstName || 'info').toLowerCase()}.${(contact.lastName || 'contact').toLowerCase()}@${domain}`,
+            score: Math.floor(Math.random() * 20) + 80,
+            source: 'hunter.io-mock'
+          }
+        })
+
+        return {
+          status: 'completed',
+          output: {
+            contacts: results,
+            metadata: { totalContacts: config.contacts.length, successful: config.contacts.length, failed: 0, cost: 0, mock: true }
+          },
+          executionTime: Date.now() - startTime,
+          error: undefined,
+          retryCount: 0,
+          startTime,
+          endTime: Date.now(),
+          metadata: { mock: true },
+          logs: []
+        }
+      }
+
+      // Real API mode
+      if (!config.apiToken) {
+        throw new Error('Hunter API token is required (unless using mock mode)')
       }
 
       const service = new HunterIoService(config.apiToken)
@@ -115,8 +157,9 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
           totalContacts: contacts.length,
           successful,
           failed,
-          cost: successful * 0.002, // Approximate cost
-          currency: 'USD'
+          cost: successful * 0.002,
+          currency: 'USD',
+          mock: false
         }
       }
 
@@ -138,7 +181,8 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
         metadata: {
           successful,
           failed,
-          cost: output.metadata.cost
+          cost: output.metadata.cost,
+          mock: false
         },
         logs: []
       }
@@ -170,6 +214,7 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
 export interface HunterEmailVerifierConfig {
   apiToken: string // {{secrets.hunter}}
   emails: string[] // {{input.emails}} or {{input.contacts[].email}}
+  mock?: boolean // Enable mock mode for testing
 }
 
 /**
@@ -190,15 +235,46 @@ export class HunterEmailVerifierBlock extends BaseBlockExecutor {
 
     try {
       this.log(context, 'info', 'Executing Hunter Email Verifier block', {
-        emailsCount: config.emails?.length || 0
+        emailsCount: config.emails?.length || 0,
+        mock: config.mock || false
       })
 
       // Validate config
-      if (!config.apiToken) {
-        throw new Error('Hunter API token is required')
-      }
       if (!config.emails || !Array.isArray(config.emails)) {
         throw new Error('Emails array is required')
+      }
+
+      // Mock mode
+      if (config.mock) {
+        this.log(context, 'info', '🧪 MOCK MODE: Simulating Hunter Email Verifier')
+
+        await MockDataGenerator.simulateLatency(100, 300)
+
+        const results = config.emails.map(email => MockDataGenerator.generateHunterVerification(email))
+
+        const valid = results.filter(r => r.status === 'valid').length
+        const risky = results.filter(r => r.status === 'risky').length
+        const invalid = results.filter(r => r.status !== 'valid' && r.status !== 'risky').length
+
+        return {
+          status: 'completed',
+          output: {
+            emails: results,
+            metadata: { totalEmails: config.emails.length, valid, risky, invalid, cost: 0, mock: true }
+          },
+          executionTime: Date.now() - startTime,
+          error: undefined,
+          retryCount: 0,
+          startTime,
+          endTime: Date.now(),
+          metadata: { mock: true },
+          logs: []
+        }
+      }
+
+      // Real API mode
+      if (!config.apiToken) {
+        throw new Error('Hunter API token is required (unless using mock mode)')
       }
 
       const service = new HunterIoService(config.apiToken)
@@ -260,8 +336,9 @@ export class HunterEmailVerifierBlock extends BaseBlockExecutor {
           valid,
           risky,
           invalid,
-          cost: emails.length * 0.0013, // Approximate cost
-          currency: 'USD'
+          cost: emails.length * 0.0013,
+          currency: 'USD',
+          mock: false
         }
       }
 
@@ -285,7 +362,8 @@ export class HunterEmailVerifierBlock extends BaseBlockExecutor {
           valid,
           risky,
           invalid,
-          cost: output.metadata.cost
+          cost: output.metadata.cost,
+          mock: false
         },
         logs: []
       }

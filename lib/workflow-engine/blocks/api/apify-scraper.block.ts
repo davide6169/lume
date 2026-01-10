@@ -12,6 +12,7 @@ import type { ExecutionContext } from '../../types'
 import { ApifyScraperService } from '@/lib/services/apify-scraper'
 
 export interface ApifyScraperConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.apify}}
   platform: 'facebook' | 'instagram' // {{input.platform}}
   url: string // {{input.url}}
@@ -34,7 +35,19 @@ export class ApifyScraperBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing Apify Scraper block', {
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 Executing Apify Scraper block in MOCK mode', {
+          platform: config.platform,
+          url: config.url
+        })
+        return await this.executeMock(config, input, context, startTime)
+      }
+
+      // LIVE MODE: Real API calls
+      this.log(context, 'info', 'Executing Apify Scraper block in LIVE mode', {
         platform: config.platform,
         url: config.url
       })
@@ -167,5 +180,87 @@ export class ApifyScraperBlock extends BaseBlockExecutor {
     }
 
     return true
+  }
+
+  /**
+   * 🎭 Execute in MOCK mode - Returns simulated data without API calls
+   */
+  private async executeMock(
+    config: ApifyScraperConfig,
+    input: any,
+    context: ExecutionContext,
+    startTime: number
+  ) {
+    // Simulate API latency (500-1500ms)
+    const mockLatency = 500 + Math.random() * 1000
+    await this.sleep(mockLatency)
+
+    const limit = config.limit || (config.platform === 'facebook' ? 100 : 1000)
+    const mockCount = Math.min(Math.floor(Math.random() * limit) + 1, limit)
+
+    // Generate realistic mock comments
+    const comments = Array.from({ length: mockCount }, (_, i) => {
+      const mockComments = config.platform === 'facebook'
+        ? [
+            'Ottimo contenuto! 👍',
+            'Condivido pienamente questo punto di vista.',
+            'Grazie per aver condiviso!',
+            'Interessante, mi piace molto.',
+            'Davvero utile, grazie!'
+          ]
+        : [
+            'Amazing shot! 📸',
+            'Love this! ❤️',
+            'Incredible photo 🔥',
+            'Wow! So beautiful',
+            'Perfect! ✨'
+          ]
+
+      return {
+        id: `mock_${config.platform}_${i + 1}`,
+        text: mockComments[i % mockComments.length],
+        username: config.platform === 'facebook' ? `user_${i + 1}` : `@user_${i + 1}`,
+        timestamp: new Date(Date.now() - Math.random() * 86400000 * 7).toISOString(),
+        likes: Math.floor(Math.random() * 100),
+        replies: Math.floor(Math.random() * 10)
+      }
+    })
+
+    const executionTime = Date.now() - startTime
+
+    // Format output (same structure as live mode)
+    const output = {
+      platform: config.platform,
+      url: config.url,
+      comments,
+      metadata: {
+        totalComments: comments.length,
+        limit,
+        fetchedAt: new Date().toISOString(),
+        mock: true, // 🎭 Mock flag
+        mockLatency: Math.round(mockLatency)
+      }
+    }
+
+    this.log(context, 'info', `🎭 Mock: Generated ${comments.length} comments`, {
+      executionTime: Math.round(executionTime),
+      mock: true
+    })
+
+    return {
+      status: 'completed' as const,
+      output,
+      executionTime,
+      error: undefined,
+      retryCount: 0,
+      startTime,
+      endTime: Date.now(),
+      metadata: {
+        commentsCount: comments.length,
+        platform: config.platform,
+        mock: true
+      },
+      logs: []
+    }
   }
 }
