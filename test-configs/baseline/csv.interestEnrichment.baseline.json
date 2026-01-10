@@ -1,0 +1,16 @@
+{
+  "blockType": "csv.interestEnrichment",
+  "description": "Baseline test config for CSV Interest Enrichment block",
+  "version": "1.0.0",
+  "generatedAt": "2026-01-10T08:02:30.104Z",
+  "input": {},
+  "config": {},
+  "secrets": {
+    "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+    "APOLLO_API_KEY": "${APOLLO_API_KEY}",
+    "HUNTER_IO_API_KEY": "${HUNTER_IO_API_KEY}",
+    "FACEBOOK_ACCESS_TOKEN": "${FACEBOOK_ACCESS_TOKEN}",
+    "INSTAGRAM_ACCESS_TOKEN": "${INSTAGRAM_ACCESS_TOKEN}"
+  },
+  "expectedOutputSchema": {}
+}
