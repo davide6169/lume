@@ -91,6 +91,7 @@ program
   .option('-f, --file <path>', 'Test configuration JSON file')
   .option('--use-baseline', 'Use baseline configuration')
   .option('--input <json>', 'Inline input JSON')
+  .option('-m, --mode <mode>', 'Execution mode: live, mock, demo, test (default: demo)', 'demo')
   .option('-w, --watch', 'Watch execution in real-time')
   .option('-j, --json', 'Output as JSON')
   .action(registerExecCommand)
@@ -130,6 +131,7 @@ blocksCmd
   .option('-t, --type <blockType>', 'Block type')
   .option('-c, --config <path>', 'Test configuration JSON file')
   .option('--use-baseline', 'Use baseline configuration')
+  .option('-m, --mode <mode>', 'Execution mode: live, mock, demo, test (default: test)', 'test')
   .option('-j, --json', 'Output as JSON')
   .action(registerBlocksTestCommand)
 

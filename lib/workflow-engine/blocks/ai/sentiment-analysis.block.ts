@@ -10,6 +10,7 @@ import type { ExecutionContext } from '../../types'
 import { OpenRouterService } from '@/lib/services/openrouter'
 
 export interface SentimentAnalysisConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.openrouter}}
   texts: string[] // Texts to analyze
   model?: string // Default: "mistralai/mistral-7b-instruct:free"
@@ -32,18 +33,89 @@ export class SentimentAnalysisBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing AI Sentiment Analysis block', {
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      this.log(context, 'info', `Executing AI Sentiment Analysis block in ${shouldMock ? 'MOCK' : 'LIVE'} mode`, {
         textsCount: config.texts?.length || 0,
         model: config.model || 'mistralai/mistral-7b-instruct:free',
         granularity: config.granularity || 'document'
       })
 
       // Validate config
-      if (!config.apiToken) {
-        throw new Error('OpenRouter API token is required')
-      }
       if (!config.texts || !Array.isArray(config.texts)) {
         throw new Error('Texts array is required')
+      }
+
+      // 🎭 MOCK MODE
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating AI sentiment analysis')
+
+        await this.sleep(300 + Math.random() * 400)
+
+        // Generate mock sentiment results
+        const sentiments = ['positive', 'neutral', 'negative']
+        const results = config.texts.map((text, i) => {
+          const sentiment = sentiments[Math.floor(Math.random() * sentiments.length)]
+          return {
+            text,
+            textId: i,
+            sentiment,
+            score: sentiment === 'positive' ? 0.7 + Math.random() * 0.3 :
+                   sentiment === 'negative' ? -0.7 - Math.random() * 0.3 :
+                   Math.random() * 0.4 - 0.2,
+            confidence: 0.7 + Math.random() * 0.3,
+            emotions: {
+              joy: sentiment === 'positive' ? Math.random() : 0,
+              anger: sentiment === 'negative' ? Math.random() : 0,
+              fear: Math.random() * 0.3,
+              surprise: Math.random() * 0.5
+            },
+            keyPhrases: ['mock phrase 1', 'mock phrase 2']
+          }
+        })
+
+        const positiveCount = results.filter(r => r.sentiment === 'positive').length
+        const negativeCount = results.filter(r => r.sentiment === 'negative').length
+        const neutralCount = results.filter(r => r.sentiment === 'neutral').length
+
+        const executionTime = Date.now() - startTime
+
+        this.log(context, 'info', 'Sentiment analysis completed (MOCK)', {
+          totalAnalyzed: results.length,
+          positive: positiveCount,
+          negative: negativeCount,
+          neutral: neutralCount
+        })
+
+        return {
+          status: 'completed' as const,
+          output: {
+            results,
+            metadata: {
+              totalAnalyzed: results.length,
+              positiveCount,
+              negativeCount,
+              neutralCount,
+              avgScore: results.reduce((sum, r) => sum + r.score, 0) / results.length,
+              model: config.model || 'mistralai/mistral-7b-instruct:free',
+              granularity: config.granularity || 'document',
+              mock: true
+            }
+          },
+          executionTime,
+          error: undefined,
+          retryCount: 0,
+          startTime,
+          endTime: Date.now(),
+          metadata: { mock: true },
+          logs: []
+        }
+      }
+
+      // LIVE MODE - Real API calls
+      if (!config.apiToken) {
+        throw new Error('OpenRouter API token is required (unless using mock mode)')
       }
 
       const service = new OpenRouterService(config.apiToken)

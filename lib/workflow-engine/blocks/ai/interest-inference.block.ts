@@ -10,6 +10,7 @@ import type { ExecutionContext } from '../../types'
 import { OpenRouterService } from '@/lib/services/openrouter'
 
 export interface InterestInferenceConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.openrouter}}
   data: Array<{
     id?: string
@@ -39,17 +40,71 @@ export class InterestInferenceBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing AI Interest Inference block', {
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      this.log(context, 'info', `Executing AI Interest Inference block in ${shouldMock ? 'MOCK' : 'LIVE'} mode`, {
         dataCount: config.data?.length || 0,
         model: config.model || 'mistralai/mistral-7b-instruct:free'
       })
 
       // Validate config
-      if (!config.apiToken) {
-        throw new Error('OpenRouter API token is required')
-      }
       if (!config.data || !Array.isArray(config.data)) {
         throw new Error('Data array is required')
+      }
+
+      // 🎭 MOCK MODE
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating AI interest inference')
+
+        await this.sleep(400 + Math.random() * 400)
+
+        // Mock interests
+        const mockInterests = [
+          { category: 'technology', confidence: 0.9, keywords: ['tech', 'software', 'AI'] },
+          { category: 'travel', confidence: 0.8, keywords: ['travel', 'adventure', 'explore'] },
+          { category: 'fitness', confidence: 0.7, keywords: ['fitness', 'gym', 'health'] }
+        ]
+
+        const results = config.data.map(contact => ({
+          ...contact,
+          interests: mockInterests,
+          interestsInferred: true,
+          inferredAt: new Date().toISOString()
+        }))
+
+        const executionTime = Date.now() - startTime
+
+        this.log(context, 'info', 'Interest inference completed (MOCK)', {
+          totalProcessed: results.length,
+          executionTime
+        })
+
+        return {
+          status: 'completed' as const,
+          output: {
+            contacts: results,
+            metadata: {
+              totalProcessed: results.length,
+              totalInterests: results.length * mockInterests.length,
+              avgInterestsPerContact: mockInterests.length,
+              model: config.model || 'mistralai/mistral-7b-instruct:free',
+              mock: true
+            }
+          },
+          executionTime,
+          error: undefined,
+          retryCount: 0,
+          startTime,
+          endTime: Date.now(),
+          metadata: { mock: true },
+          logs: []
+        }
+      }
+
+      // LIVE MODE - Real API calls
+      if (!config.apiToken) {
+        throw new Error('OpenRouter API token is required (unless using mock mode)')
       }
 
       const service = new OpenRouterService(config.apiToken)

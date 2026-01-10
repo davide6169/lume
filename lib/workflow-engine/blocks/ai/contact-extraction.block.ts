@@ -10,6 +10,7 @@ import type { ExecutionContext } from '../../types'
 import { OpenRouterService } from '@/lib/services/openrouter'
 
 export interface ContactExtractionConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.openrouter}}
   text: string // Text to extract contacts from
   model?: string // Default: "mistralai/mistral-7b-instruct:free"
@@ -33,17 +34,81 @@ export class ContactExtractionBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing AI Contact Extraction block', {
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      this.log(context, 'info', `Executing AI Contact Extraction block in ${shouldMock ? 'MOCK' : 'LIVE'} mode`, {
         model: config.model || 'mistralai/mistral-7b-instruct:free',
         textLength: config.text?.length || 0
       })
 
       // Validate config
-      if (!config.apiToken) {
-        throw new Error('OpenRouter API token is required')
-      }
       if (!config.text) {
         throw new Error('Text is required for contact extraction')
+      }
+
+      // 🎭 MOCK MODE
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating AI contact extraction')
+
+        // Simulate API latency
+        await this.sleep(500 + Math.random() * 500)
+
+        // Generate mock contacts based on text length
+        const mockContacts = [
+          {
+            firstName: 'Mario',
+            lastName: 'Rossi',
+            email: 'mario.rossi@example.com',
+            phone: '+39 333 1234567',
+            company: 'Mock Company'
+          },
+          {
+            firstName: 'Luca',
+            lastName: 'Bianchi',
+            email: 'luca.bianchi@example.com',
+            company: 'Test Inc'
+          }
+        ]
+
+        const executionTime = Date.now() - startTime
+
+        this.log(context, 'info', 'Contact extraction completed (MOCK)', {
+          totalExtracted: mockContacts.length,
+          executionTime
+        })
+
+        return {
+          status: 'completed' as const,
+          output: {
+            contacts: mockContacts,
+            metadata: {
+              totalExtracted: mockContacts.length,
+              validContacts: mockContacts.length,
+              filteredOut: 0,
+              minFields: config.minFields || 2,
+              model: config.model || 'mistralai/mistral-7b-instruct:free',
+              textLength: config.text.length,
+              mock: true
+            }
+          },
+          executionTime,
+          error: undefined,
+          retryCount: 0,
+          startTime,
+          endTime: Date.now(),
+          metadata: {
+            totalExtracted: mockContacts.length,
+            validContacts: mockContacts.length,
+            mock: true
+          },
+          logs: []
+        }
+      }
+
+      // LIVE MODE - Real API calls
+      if (!config.apiToken) {
+        throw new Error('OpenRouter API token is required (unless using mock mode)')
       }
 
       const service = new OpenRouterService(config.apiToken)

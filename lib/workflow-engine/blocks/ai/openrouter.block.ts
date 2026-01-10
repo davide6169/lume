@@ -11,6 +11,7 @@ import { OpenRouterService } from '@/lib/services/openrouter'
 import { MockDataGenerator } from '../../utils/mock-data-generator'
 
 export interface OpenRouterConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.openrouter}}
   model: string // e.g., "mistralai/mistral-7b-instruct:free"
   messages: Array<{
@@ -20,7 +21,6 @@ export interface OpenRouterConfig {
   maxTokens?: number // Default: 1000
   temperature?: number // Default: 0.7
   topLevel?: number // Default: 1.0
-  mock?: boolean // Enable mock mode for testing
 }
 
 /**
@@ -39,10 +39,12 @@ export class OpenRouterBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing OpenRouter LLM block', {
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      this.log(context, 'info', `Executing OpenRouter LLM block in ${shouldMock ? 'MOCK' : 'LIVE'} mode`, {
         model: config.model,
-        messagesCount: config.messages.length,
-        mock: config.mock || false
+        messagesCount: config.messages.length
       })
 
       // Validate config
@@ -53,9 +55,9 @@ export class OpenRouterBlock extends BaseBlockExecutor {
         throw new Error('Model is required')
       }
 
-      // Mock mode - skip API calls
-      if (config.mock) {
-        this.log(context, 'info', '🧪 MOCK MODE: Simulating OpenRouter LLM without API calls')
+      // 🎭 MOCK MODE - skip API calls
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating OpenRouter LLM without API calls')
 
         // Simulate API latency
         await MockDataGenerator.simulateLatency(300, 1000)
@@ -84,7 +86,7 @@ export class OpenRouterBlock extends BaseBlockExecutor {
         }
       }
 
-      // Real API mode
+      // LIVE MODE - Real API calls
       if (!config.apiToken) {
         throw new Error('OpenRouter API token is required (unless using mock mode)')
       }
