@@ -27,6 +27,20 @@ export {
   type MixedbreadEmbeddingsConfig
 } from './api/mixedbread-embeddings.block'
 
+export {
+  InstagramSearchBlock,
+  type InstagramSearchConfig,
+  type InstagramSearchInput,
+  type InstagramSearchOutput
+} from './api/instagram-search.block'
+
+export {
+  LinkedInSearchBlock,
+  type LinkedInSearchConfig,
+  type LinkedInSearchInput,
+  type LinkedInSearchOutput
+} from './api/linkedin-search.block'
+
 // AI Blocks
 export {
   OpenRouterBlock,
@@ -124,6 +138,8 @@ import { ApifyScraperBlock } from './api/apify-scraper.block'
 import { ApolloEnrichmentBlock } from './api/apollo-enrichment.block'
 import { HunterEmailFinderBlock, HunterEmailVerifierBlock } from './api/hunter-io.block'
 import { MixedbreadEmbeddingsBlock } from './api/mixedbread-embeddings.block'
+import { InstagramSearchBlock } from './api/instagram-search.block'
+import { LinkedInSearchBlock } from './api/linkedin-search.block'
 import { OpenRouterBlock } from './ai/openrouter.block'
 import { ContactExtractionBlock } from './ai/contact-extraction.block'
 import { InterestInferenceBlock } from './ai/interest-inference.block'
@@ -169,6 +185,20 @@ export function registerAllBuiltInBlocks(): void {
   registerBlock('api.mixedbread', MixedbreadEmbeddingsBlock as any, {
     name: 'Mixedbread Embeddings',
     description: 'Generates vector embeddings using Mixedbread',
+    category: 'api',
+    version: '1.0.0'
+  })
+
+  registerBlock('api.instagramSearch', InstagramSearchBlock as any, {
+    name: 'Instagram Search',
+    description: 'Search Instagram profiles using Apify. Extracts bio, posts, and profile data. Cost: ~$0.050 per search.',
+    category: 'api',
+    version: '1.0.0'
+  })
+
+  registerBlock('api.linkedinSearch', LinkedInSearchBlock as any, {
+    name: 'LinkedIn Search',
+    description: 'Search LinkedIn profiles using Apify (supreme_coder actor). Extracts bio, headline, skills. Cost: ~$0.003 per search. NO LinkedIn cookie required.',
     category: 'api',
     version: '1.0.0'
   })

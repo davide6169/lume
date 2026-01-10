@@ -136,13 +136,14 @@ export const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
     // ========================================
     {
       id: 'linkedin-search',
-      type: 'api.apify',
+      type: 'api.linkedinSearch',
       name: 'LinkedIn Enrichment (Apify)',
       description: 'Search LinkedIn profile using Apify - business emails only',
       config: {
         apiToken: '{{secrets.apify}}',
         actor: 'supreme_coder/linkedin-profile-scraper',
-        mode: 'live'
+        mode: 'live',
+        maxResults: 1
       },
       inputSchema: { type: 'array' },
       outputSchema: { type: 'array' },
@@ -165,7 +166,7 @@ export const csvInterestEnrichmentWorkflow: WorkflowDefinition = {
 
     {
       id: 'instagram-search',
-      type: 'api.apify',
+      type: 'api.instagramSearch',
       name: 'Instagram Profile Search (Apify)',
       description: 'Search Instagram profile and extract bio/posts',
       config: {
