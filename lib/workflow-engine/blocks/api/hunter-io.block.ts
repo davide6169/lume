@@ -44,9 +44,11 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing Hunter Email Finder block', {
-        contactsCount: config.contacts?.length || 0,
-        mock: config.mock || false
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      this.log(context, 'info', `Executing Hunter Email Finder block in ${shouldMock ? 'MOCK' : 'LIVE'} mode`, {
+        contactsCount: config.contacts?.length || 0
       })
 
       // Validate config
@@ -54,9 +56,9 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
         throw new Error('Contacts array is required')
       }
 
-      // Mock mode
-      if (config.mock) {
-        this.log(context, 'info', '🧪 MOCK MODE: Simulating Hunter Email Finder')
+      // 🎭 MOCK MODE
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating Hunter Email Finder')
 
         await MockDataGenerator.simulateLatency(150, 500)
 
@@ -91,7 +93,7 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
         }
       }
 
-      // Real API mode
+      // LIVE MODE - Real API calls
       if (!config.apiToken) {
         throw new Error('Hunter API token is required (unless using mock mode)')
       }
@@ -212,9 +214,9 @@ export class HunterEmailFinderBlock extends BaseBlockExecutor {
 // ============================================
 
 export interface HunterEmailVerifierConfig {
+  mode?: 'live' | 'mock' // Force mock mode (default: live in production, mock in demo/test)
   apiToken: string // {{secrets.hunter}}
   emails: string[] // {{input.emails}} or {{input.contacts[].email}}
-  mock?: boolean // Enable mock mode for testing
 }
 
 /**
@@ -234,9 +236,11 @@ export class HunterEmailVerifierBlock extends BaseBlockExecutor {
     const startTime = Date.now()
 
     try {
-      this.log(context, 'info', 'Executing Hunter Email Verifier block', {
-        emailsCount: config.emails?.length || 0,
-        mock: config.mock || false
+      // 🎭 MOCK MODE: Check if we should use mock data
+      const shouldMock = config.mode === 'mock' || context.mode === 'demo' || context.mode === 'test'
+
+      this.log(context, 'info', `Executing Hunter Email Verifier block in ${shouldMock ? 'MOCK' : 'LIVE'} mode`, {
+        emailsCount: config.emails?.length || 0
       })
 
       // Validate config
@@ -244,9 +248,9 @@ export class HunterEmailVerifierBlock extends BaseBlockExecutor {
         throw new Error('Emails array is required')
       }
 
-      // Mock mode
-      if (config.mock) {
-        this.log(context, 'info', '🧪 MOCK MODE: Simulating Hunter Email Verifier')
+      // 🎭 MOCK MODE
+      if (shouldMock) {
+        this.log(context, 'info', '🎭 MOCK MODE: Simulating Hunter Email Verifier')
 
         await MockDataGenerator.simulateLatency(100, 300)
 
