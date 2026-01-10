@@ -1,0 +1,17 @@
+{
+  "description": "Workflow CLI configuration - Copy this to .workflow-cli.json and configure your database credentials",
+  "database": {
+    "supabaseUrl": "https://your-project.supabase.co",
+    "supabaseKey": "your-service-role-key",
+    "tenantId": ""
+  },
+  "secrets": {
+    "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+    "APOLLO_API_KEY": "${APOLLO_API_KEY}",
+    "HUNTER_IO_API_KEY": "${HUNTER_IO_API_KEY}"
+  },
+  "defaults": {
+    "outputFormat": "table",
+    "verbose": false
+  }
+}

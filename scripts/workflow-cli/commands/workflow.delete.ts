@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../utils/logger'
+import { databaseService } from '../utils/db'
 import readline from 'readline'
 
 export async function registerDeleteCommand(options: {
@@ -15,29 +16,55 @@ export async function registerDeleteCommand(options: {
     process.exit(1)
   }
 
-  logger.header('Delete Workflow')
-  logger.warn(`You are about to delete workflow: ${options.id}`)
+  try {
+    await databaseService.initialize()
+    const workflowService = databaseService.getWorkflowService()
 
-  // Confirm deletion unless --yes flag is provided
-  if (!options.yes) {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    })
+    logger.header('Delete Workflow')
 
-    const answer = await new Promise<string>((resolve) => {
-      rl.question('Are you sure? (yes/no): ', resolve)
-    })
-
-    rl.close()
-
-    if (answer.toLowerCase() !== 'yes') {
-      logger.info('Deletion cancelled')
-      process.exit(0)
+    // Get workflow details first
+    const workflow = await workflowService.getWorkflowByWorkflowId(options.id)
+    if (!workflow) {
+      logger.error(`Workflow not found: ${options.id}`)
+      process.exit(1)
     }
-  }
 
-  // TODO: Delete from database
-  logger.warn('Database integration not yet implemented')
-  logger.info(`Workflow "${options.id}" ready to be deleted`)
+    logger.warn(`You are about to delete workflow: ${workflow.name}`)
+    logger.kv('ID', workflow.workflow_id)
+    logger.kv('Name', workflow.name)
+    logger.kv('Category', workflow.category || '-')
+    logger.kv('Executions', workflow.total_executions || 0)
+
+    // Confirm deletion unless --yes flag is provided
+    if (!options.yes) {
+      console.log('')
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      })
+
+      const answer = await new Promise<string>((resolve) => {
+        rl.question('Are you sure you want to delete this workflow? (yes/no): ', resolve)
+      })
+
+      rl.close()
+
+      if (answer.toLowerCase() !== 'yes') {
+        logger.info('Deletion cancelled')
+        process.exit(0)
+      }
+    }
+
+    // Delete from database
+    console.log('')
+    logger.info('Deleting workflow from database...')
+
+    await workflowService.deleteWorkflowByWorkflowId(options.id)
+
+    console.log('')
+    logger.success(`✅ Workflow deleted successfully: ${options.id}`)
+  } catch (error: any) {
+    logger.error(`Failed to delete workflow: ${error.message}`)
+    process.exit(1)
+  }
 }

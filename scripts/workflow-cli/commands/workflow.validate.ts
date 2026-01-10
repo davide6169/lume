@@ -36,9 +36,9 @@ export async function registerValidateCommand(options: {
         console.log('')
         logger.subheader('Errors:')
         result.errors?.forEach(error => {
-          logger.error(`  • ${error.message}`)
-          if (error.path) {
-            logger.info(`    Path: ${error.path.join('.')}`)
+          logger.error(`  • ${error.message || error}`)
+          if (error && typeof error === 'object' && 'path' in error) {
+            logger.info(`    Path: ${(error as any).path?.join('.') || 'N/A'}`)
           }
         })
 

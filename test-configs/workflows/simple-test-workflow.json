@@ -1,0 +1,39 @@
+{
+  "workflowId": "cli-test-workflow",
+  "name": "CLI Test Workflow",
+  "description": "Simple workflow for testing CLI functionality",
+  "version": 1,
+  "category": "test",
+  "tags": ["test", "cli", "demo"],
+  "metadata": {
+    "author": "CLI Tool",
+    "createdAt": "2026-01-10"
+  },
+  "nodes": [
+    {
+      "id": "input",
+      "type": "input.static",
+      "name": "Static Input",
+      "config": {
+        "data": {
+          "message": "Hello from CLI!",
+          "timestamp": "2026-01-10"
+        }
+      }
+    },
+    {
+      "id": "output",
+      "type": "output.logger",
+      "name": "Logger Output",
+      "config": {
+        "format": "pretty"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "input",
+      "to": "output"
+    }
+  ]
+}
