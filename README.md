@@ -44,6 +44,27 @@
 
 ---
 
+## 📚 Documentation
+
+### Workflow Engine 🆕
+
+**Complete documentation for blocks and workflows:**
+
+- **[📖 Workflow Engine Index](./docs/workflow-engine/INDEX.md)** - 🌟 START HERE - All blocks and workflows catalog
+- **[🚀 CLI Guide](./lib/workflow-engine/CLI-GUIDE.md)** - Command-line interface reference
+- **[🎭 Mock Mode Guide](./lib/workflow-engine/MOCK-MODE-GUIDE.md)** - Develop without API costs
+
+**Quick Start:**
+```bash
+# Test a block (demo mode, auto-loads baseline)
+npm run workflow -- blocks test --type csv.interestEnrichment --mode demo
+
+# Execute a workflow
+npm run workflow -- exec --id my-workflow --mode demo
+```
+
+---
+
 ## 🚀 Quick Start
 
 ```bash
