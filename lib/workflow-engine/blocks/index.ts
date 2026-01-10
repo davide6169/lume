@@ -100,6 +100,20 @@ export {
   type CSVInterestEnrichmentOutput
 } from './csv/csv-interest-enrichment.block'
 
+export {
+  CSVParserBlock,
+  type CSVParserConfig,
+  type CSVParserInput,
+  type CSVParserOutput
+} from './csv/csv-parser.block'
+
+export {
+  CSVAssemblerBlock,
+  type CSVAssemblerConfig,
+  type CSVAssemblerInput,
+  type CSVAssemblerOutput
+} from './csv/csv-assembler.block'
+
 /**
  * Register all built-in blocks to the registry
  */
@@ -119,6 +133,8 @@ import { BranchBlock } from './branch/branch.block'
 import { CountryConfigBlock } from './countries/country-config.block'
 import { LeadEnrichmentBlock } from './enrichment/lead-enrichment.block'
 import { CSVInterestEnrichmentBlock } from './csv/csv-interest-enrichment.block'
+import { CSVParserBlock } from './csv/csv-parser.block'
+import { CSVAssemblerBlock } from './csv/csv-assembler.block'
 
 export function registerAllBuiltInBlocks(): void {
   // API Blocks
@@ -221,6 +237,20 @@ export function registerAllBuiltInBlocks(): void {
   registerBlock('csv.interestEnrichment', CSVInterestEnrichmentBlock as any, {
     name: 'CSV Interest Enrichment',
     description: 'Enrich CSV with interests field. Adds "interessi" column with comma-separated interests extracted from LinkedIn/Instagram. Empty if no bio data found.',
+    category: 'csv',
+    version: '1.0.0'
+  })
+
+  registerBlock('csv.parser', CSVParserBlock as any, {
+    name: 'CSV Parser',
+    description: 'Parse CSV string into structured data with headers and rows. Supports configurable delimiter and encoding.',
+    category: 'csv',
+    version: '1.0.0'
+  })
+
+  registerBlock('csv.assembler', CSVAssemblerBlock as any, {
+    name: 'CSV Assembler',
+    description: 'Assemble final CSV with interests column. Filters out rows without interests. Generates CSV string output.',
     category: 'csv',
     version: '1.0.0'
   })
