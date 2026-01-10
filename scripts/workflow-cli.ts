@@ -93,6 +93,7 @@ program
   .option('--input <json>', 'Inline input JSON')
   .option('-m, --mode <mode>', 'Execution mode: live, mock, demo, test (default: demo)', 'demo')
   .option('-w, --watch', 'Watch execution in real-time')
+  .option('--no-cache', 'Disable caching and force fresh API calls')
   .option('-j, --json', 'Output as JSON')
   .action(registerExecCommand)
 

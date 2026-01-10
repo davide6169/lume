@@ -285,6 +285,7 @@ export interface ExecutionContext {
   parentContext?: ExecutionContext
   logger: Logger
   progress?: ProgressCallback
+  disableCache?: boolean // Disable caching for fresh data
   setVariable(key: string, value: any): void
   getVariable(key: string): any
   setVariables(vars: Record<string, any>): void

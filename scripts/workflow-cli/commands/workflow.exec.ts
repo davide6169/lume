@@ -18,6 +18,7 @@ export async function registerExecCommand(options: {
   input?: string
   mode?: string
   watch?: boolean
+  noCache?: boolean
   json?: boolean
 }): Promise<void> {
   // Initialize blocks
@@ -126,6 +127,7 @@ export async function registerExecCommand(options: {
     logger.subheader('Execution Configuration')
     logger.kv('Workflow ID', options.id)
     logger.kv('Mode', executionMode)
+    logger.kv('Cache', options.noCache ? 'Disabled (--no-cache)' : 'Enabled')
     logger.kv('Watch Mode', options.watch ? 'Enabled' : 'Disabled')
 
     if (Object.keys(input).length > 0) {
@@ -169,6 +171,7 @@ export async function registerExecCommand(options: {
       mode: executionMode,
       variables,
       secrets,
+      disableCache: options.noCache, // Pass --no-cache flag to context
       logger: {
         debug: (msg: string, meta?: any) => logger.debug(msg, meta),
         info: (msg: string, meta?: any) => logger.info(msg, meta),

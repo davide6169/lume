@@ -106,6 +106,7 @@ export class ContextManager implements ExecutionContext {
   parentContext?: ExecutionContext
   logger: Logger
   progress?: ProgressCallback
+  disableCache?: boolean // Disable caching for this execution
 
   private env: Record<string, string>
   private _metadata: Map<string, any>
@@ -120,6 +121,7 @@ export class ContextManager implements ExecutionContext {
     parentContext?: ExecutionContext
     logger?: Logger
     progress?: ProgressCallback
+    disableCache?: boolean // Disable caching for fresh data
   }) {
     this.workflowId = config.workflowId
     this.executionId = config.executionId
@@ -132,7 +134,13 @@ export class ContextManager implements ExecutionContext {
     this.parentContext = config.parentContext
     this.logger = config.logger || new DefaultLogger(config.executionId)
     this.progress = config.progress
+    this.disableCache = config.disableCache || false
     this._metadata = new Map()
+
+    // Log cache status
+    if (this.disableCache) {
+      this.logger.info('Cache disabled: All API calls will be made (no cache)')
+    }
   }
 
   /**
