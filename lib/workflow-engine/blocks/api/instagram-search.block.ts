@@ -9,6 +9,13 @@
  *
  * Actor: apify/instagram-scraper
  * Cost: ~$0.050 per search
+ *
+ * IMPORTANT NOTES:
+ * - maxPosts default: 3 (reduced from 12 to avoid timeout)
+ * - Timeout: 300 seconds (5 minutes) per profile
+ * - If you get "Monthly usage hard limit exceeded", your Apify plan
+ *   has reached the monthly limit. Wait for monthly reset or upgrade plan.
+ * - Consider using includePosts: false for faster results
  */
 
 import { BaseBlockExecutor } from '../../registry'
@@ -21,7 +28,7 @@ export interface InstagramSearchConfig {
   actor?: string // Default: 'apify/instagram-scraper'
   maxResults?: number // Max posts per profile (default: 10)
   includePosts?: boolean // Include posts in results (default: true)
-  maxPosts?: number // Max posts to fetch (default: 12)
+  maxPosts?: number // Max posts to fetch (default: 3) - reduced from 12 to avoid timeout
 }
 
 export interface InstagramSearchInput {
@@ -99,7 +106,7 @@ export class InstagramSearchBlock extends BaseBlockExecutor {
       this.log(context, 'info', 'Searching Instagram profiles', {
         contactsCount: input.contacts.length,
         includePosts: config.includePosts !== false,
-        maxPosts: config.maxPosts || 12
+        maxPosts: config.maxPosts || 3
       })
 
       // Validate input
@@ -231,27 +238,69 @@ export class InstagramSearchBlock extends BaseBlockExecutor {
 
   /**
    * Guess Instagram username from contact data
+   * Priority: First try name-based patterns (without dots), then email
+   * Note: Instagram ignores dots in usernames, so we use concatenated names
+   *
+   * Returns: Single best guess username (for single search)
    */
   private guessInstagramUsername(contact: any): string | null {
-    // Try to extract from email (part before @)
-    if (contact.email) {
-      const emailParts = contact.email.split('@')
-      if (emailParts.length > 0) {
-        const emailUsername = emailParts[0].toLowerCase().replace(/[^a-z0-9._]/g, '')
-        if (emailUsername.length > 2) {
-          return emailUsername
+    // Try to create from name (multiple patterns)
+    if (contact.nome) {
+      const nameParts = contact.nome
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove accents
+        .replace(/[^a-z\s]/g, '') // Remove non-letters
+        .trim()
+        .split(/\s+/)
+
+      if (nameParts.length >= 2) {
+        const firstName = nameParts[0]
+        const lastName = nameParts[nameParts.length - 1]
+
+        // Try lastname only (most common for artists/celebrities)
+        // Example: "Fabio Rovazzi" -> "rovazzi"
+        if (lastName.length >= 4) {
+          return lastName
+        }
+
+        // Pattern 1: firstnamelastname (marcomontemagno) - most common
+        const username1 = `${firstName}${lastName}`
+        if (username1.length > 3) {
+          return username1
+        }
+
+        // Pattern 2: firstnamelastname with all name parts
+        const username2 = nameParts.join('')
+        if (username2.length > 3 && username2 !== username1) {
+          return username2
+        }
+
+        // Pattern 3: firstname_lastname
+        const username3 = `${firstName}_${lastName}`
+        if (username3.length > 3) {
+          return username3
+        }
+
+        // Pattern 4: firstname.lastname (less common but possible)
+        const username4 = `${firstName}.${lastName}`
+        if (username4.length > 3) {
+          return username4
         }
       }
     }
 
-    // Try to create from name
-    if (contact.nome) {
-      const nameParts = contact.nome.toLowerCase().split(' ')
-      if (nameParts.length >= 2) {
-        // Combine first and last name
-        const username = (nameParts[0] + '.' + nameParts[nameParts.length - 1]).replace(/[^a-z0-9.]/g, '')
-        if (username.length > 2) {
-          return username
+    // Fallback: Try to extract from email (part before @)
+    // Only if it looks like a real name, not "info" or "admin"
+    if (contact.email) {
+      const emailParts = contact.email.split('@')
+      if (emailParts.length > 0) {
+        const emailUsername = emailParts[0].toLowerCase().replace(/[^a-z0-9._]/g, '')
+
+        // Skip generic email usernames
+        const genericUsernames = ['info', 'admin', 'contact', 'support', 'hello', 'mail', 'management', 'staff']
+        if (emailUsername.length > 3 && !genericUsernames.includes(emailUsername)) {
+          return emailUsername
         }
       }
     }
@@ -291,7 +340,7 @@ export class InstagramSearchBlock extends BaseBlockExecutor {
       const requestBody = {
         directUrls: [profileUrl],
         resultsType: config.includePosts !== false ? 'posts' : 'details',
-        maxItems: config.maxPosts || 12,
+        maxItems: config.maxPosts || 3,
         addParentData: false
       }
 
@@ -320,7 +369,9 @@ export class InstagramSearchBlock extends BaseBlockExecutor {
 
       const completedRun = await this.waitForRun(config.apiToken, run.id, actorId)
 
-      if (!completedRun.datasetId) {
+      // Apify returns defaultDatasetId, not datasetId
+      const datasetId = completedRun.datasetId || completedRun.defaultDatasetId
+      if (!datasetId) {
         return {
           found: false,
           error: 'No dataset returned from Apify'
@@ -328,7 +379,14 @@ export class InstagramSearchBlock extends BaseBlockExecutor {
       }
 
       // Fetch results
-      const items = await this.fetchDataset(config.apiToken, completedRun.datasetId)
+      const items = await this.fetchDataset(config.apiToken, datasetId)
+
+      this.log(context, 'debug', 'Fetched dataset from Apify', {
+        datasetId,
+        itemsCount: items?.length || 0,
+        firstItemType: items?.[0]?.type,
+        firstItemUsername: items?.[0]?.username
+      })
 
       if (!items || items.length === 0) {
         return {
@@ -338,17 +396,21 @@ export class InstagramSearchBlock extends BaseBlockExecutor {
       }
 
       // Parse Instagram profile data
-      const profileItem = items[0] // First item should be profile data
+      // When includePosts: false, only profile data is returned (1 item)
+      // When includePosts: true, profile is first item + posts
+      const profileItem = items.find(item =>
+        !item.type || item.type !== 'post' && item.type !== 'Video'
+      ) || items[0] // Fallback to first item
 
       return {
         found: true,
         username: profileItem.username || username,
-        url: profileUrl,
-        bio: profileItem.bio || profileItem.description,
+        url: profileItem.url || profileUrl,
+        bio: profileItem.biography || profileItem.bio || profileItem.description,
         fullName: profileItem.fullName || profileItem.name,
         followers: profileItem.followersCount || profileItem.followers,
         following: profileItem.followsCount || profileItem.following,
-        posts: this.extractPosts(items, config.maxPosts || 12)
+        posts: this.extractPosts(items, config.maxPosts || 3)
       }
 
     } catch (error) {
@@ -444,13 +506,20 @@ export class InstagramSearchBlock extends BaseBlockExecutor {
 
       const batch = await response.json()
 
-      if (!batch.items || batch.items.length === 0) {
+      // Apify returns either:
+      // 1. An array directly (when items exist)
+      // 2. An object with {items: [...], total: ...} (paginated)
+      const batchItems = Array.isArray(batch) ? batch : (batch.items || [])
+
+      if (batchItems.length === 0) {
         break
       }
 
-      items.push(...batch.items)
+      items.push(...batchItems)
 
-      if (batch.items.length < limit) {
+      // If we got less than the limit, we're on the last page
+      // Or if batch is an object with items, check pagination
+      if (batchItems.length < limit || (Array.isArray(batch) && batch.length < limit)) {
         break // Last page
       }
 

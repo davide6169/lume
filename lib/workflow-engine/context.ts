@@ -333,6 +333,22 @@ export class ContextManager implements ExecutionContext {
       this.logger.clearLogs()
     }
   }
+
+  /**
+   * Check if currently in mock mode (demo or test)
+   */
+  isMockMode(): boolean {
+    return this.mode === 'demo' || this.mode === 'test'
+  }
+
+  /**
+   * Validate if a block type supports mock mode
+   */
+  validateMockCapability(blockType: string): boolean {
+    // Dynamic import to avoid circular dependency
+    const { blockSupportsMock } = require('./registry')
+    return blockSupportsMock(blockType)
+  }
 }
 
 /**

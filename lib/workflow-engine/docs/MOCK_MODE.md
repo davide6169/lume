@@ -158,11 +158,26 @@ const hunterMock = MockDataGenerator.generateHunterVerification(email)
 ### CLI Usage
 
 ```bash
-# Test workflow with mock mode
-npm run workflow exec -- --id demo-enrichment --mode demo
+# Test block with mock mode (auto-loads baseline)
+npm run workflow blocks test -- --type api.apify --mode demo
 
-# Test specific block with mock mode
-npm run workflow blocks test -- --type api.apollo --config ./mock-config.json
+# Test block with live mode (requires real API keys)
+npm run workflow blocks test -- --type api.apify --mode live --config ./test.json
+
+# Test block with custom config
+npm run workflow blocks test -- --type api.apify --config ./test-config.json
+
+# Pipe config via stdin
+echo '{"input": {...}, "config": {...}}' | npm run workflow blocks test -- --type api.apify
+
+# Execute workflow with mock mode
+npm run workflow exec -- --id demo-workflow --mode demo
+
+# Execute workflow with live mode
+npm run workflow exec -- --id csv-enrichment --mode live --input '{"contacts": [...]}'
+
+# Execute workflow with watch mode
+npm run workflow exec -- --id demo-workflow --mode demo --watch
 ```
 
 ## Mock Response Format
@@ -209,15 +224,15 @@ All mock responses include:
 
 ## Implementation Status
 
-✅ **Implemented:**
+✅ **Fully Implemented:**
 - `api.apollo` - Apollo Enrichment
 - `ai.openrouter` - OpenRouter LLM
 - `api.hunter.finder` - Hunter Email Finder
 - `api.hunter.verifier` - Hunter Email Verifier
+- `api.mixedbread` - Mixedbread Embeddings
+- `api.apify` - Apify Scrapers (Facebook, Instagram)
 
 🚧 **To Be Implemented:**
-- `api.mixedbread` - Mixedbread Embeddings
-- `api.apify` - Apify Scrapers
 - `csv.interestEnrichment` - CSV Interest Enrichment
 - `ai.contactExtraction` - AI Contact Extraction
 - `ai.interestInference` - AI Interest Inference

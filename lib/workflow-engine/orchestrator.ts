@@ -18,7 +18,7 @@ import {
   TimelineEvent,
   BlockExecutor
 } from './types'
-import { createBlockExecutor } from './registry'
+import { createBlockExecutor, validateMockSupport } from './registry'
 
 /**
  * Workflow Orchestrator
@@ -44,6 +44,25 @@ export class WorkflowOrchestrator {
     })
 
     try {
+      // NEW: Validate mock mode before execution
+      if ((context as any).isMockMode && (context as any).isMockMode()) {
+        const mockValidation = validateMockSupport(workflow)
+
+        if (!mockValidation.valid) {
+          this.log(context, 'error', 'Mock mode validation failed', {
+            unsupportedBlocks: mockValidation.unsupportedBlocks
+          })
+
+          throw new Error(
+            `Cannot execute in ${(context as any).mode} mode: The following blocks don't support mock mode: ${mockValidation.unsupportedBlocks.join(', ')}`
+          )
+        }
+
+        this.log(context, 'info', 'Mock mode validation passed', {
+          mode: (context as any).mode
+        })
+      }
+
       // Create execution plan
       const plan = this.createExecutionPlan(workflow)
       this.log(context, 'info', 'Execution plan created', {

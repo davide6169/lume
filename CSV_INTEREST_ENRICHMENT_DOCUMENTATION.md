@@ -164,9 +164,14 @@ Output: { contacts: Array<{original, instagram?, enrichmentMetadata}> }
   mode: 'live',
   maxResults: 10,
   includePosts: true,
-  maxPosts: 12
+  maxPosts: 3 // Ridotto da 12 per evitare timeout
 }
 ```
+
+**⚠️ NOTE IMPORTANTI:**
+- **Timeout**: 300 secondi (5 minuti) per profilo
+- **Limite mensile Apify**: Se ricevi errore `Monthly usage hard limit exceeded`, il piano Apify ha raggiunto il limite mensile
+- **Per velocizzare**: Usa `includePosts: false` o riduci `maxPosts` a 1-2
 
 #### 4. LinkedIn Search Block
 **File**: `lib/workflow-engine/blocks/api/linkedin-search.block.ts`
@@ -191,6 +196,11 @@ Output: { contacts: Array<{original, linkedin?, enrichmentMetadata}> }
   maxResults: 1
 }
 ```
+
+**⚠️ NOTE IMPORTANTI:**
+- **Input format**: Usa `urls: [profileUrl]` (non `url` o `startUrls`)
+- **Profile URL**: `https://www.linkedin.com/in/firstname-lastname`
+- **Limite mensile Apify**: Se ricevi errore `Monthly usage hard limit exceeded`, il piano Apify ha raggiunto il limite mensile
 
 ---
 
@@ -536,6 +546,16 @@ Error: OpenRouter token validation failed
 #### 4. Rate Limit 429
 **Problema**: Troppe richieste API
 **Soluzione**: Automatico con RateLimiter, aumentare delay
+
+#### 5. Apify Monthly Limit Exceeded
+**Problema**: `Monthly usage hard limit exceeded`
+**Soluzione**:
+- Il piano Apify ha raggiunto il limite mensile di utilizzo
+- Opzioni:
+  - Attendere il reset mensile (inizio del prossimo mese)
+  - Upgrade del piano Apify per aumentare il limite
+  - Usare mock mode (`mode: 'demo'`) per testare senza API
+- Verifica il limite: Apify Dashboard > Plans & Billing
 
 ### Logging
 

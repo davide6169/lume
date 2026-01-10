@@ -41,6 +41,20 @@ export {
   type LinkedInSearchOutput
 } from './api/linkedin-search.block'
 
+export {
+  FullContactSearchBlock,
+  type FullContactSearchConfig,
+  type FullContactSearchInput,
+  type FullContactSearchOutput
+} from './api/fullcontact-search.block'
+
+export {
+  PDLSearchBlock,
+  type PDLSearchConfig,
+  type PDLSearchInput,
+  type PDLSearchOutput
+} from './api/pdl-search.block'
+
 // AI Blocks
 export {
   OpenRouterBlock,
@@ -56,6 +70,13 @@ export {
   InterestInferenceBlock,
   type InterestInferenceConfig
 } from './ai/interest-inference.block'
+
+export {
+  LLMMergeInterestsBlock,
+  type LLMMergeInterestsConfig,
+  type LLMMergeInterestsInput,
+  type LLMMergeInterestsOutput
+} from './ai/llm-merge-interests.block'
 
 export {
   SentimentAnalysisBlock,
@@ -109,6 +130,12 @@ export {
   type ContactNormalizerOutput
 } from './transform/contact-normalizer.block'
 
+export {
+  MergeEnrichmentBlock,
+  type MergeEnrichmentConfig,
+  type MergeEnrichmentInput
+} from './transform/merge-enrichment.block'
+
 // Country Blocks
 export {
   CountryConfigBlock,
@@ -161,15 +188,19 @@ import { HunterEmailFinderBlock, HunterEmailVerifierBlock } from './api/hunter-i
 import { MixedbreadEmbeddingsBlock } from './api/mixedbread-embeddings.block'
 import { InstagramSearchBlock } from './api/instagram-search.block'
 import { LinkedInSearchBlock } from './api/linkedin-search.block'
+import { FullContactSearchBlock } from './api/fullcontact-search.block'
+import { PDLSearchBlock } from './api/pdl-search.block'
 import { OpenRouterBlock } from './ai/openrouter.block'
 import { ContactExtractionBlock } from './ai/contact-extraction.block'
 import { InterestInferenceBlock } from './ai/interest-inference.block'
+import { LLMMergeInterestsBlock } from './ai/llm-merge-interests.block'
 import { SentimentAnalysisBlock } from './ai/sentiment-analysis.block'
 import { FilterBlock } from './filter/filter.block'
 import { HasBioDataFilterBlock } from './filter/has-bio-data.block'
 import { BranchBlock } from './branch/branch.block'
 import { EmailClassifierBlock } from './transform/email-classifier.block'
 import { ContactNormalizerBlock } from './transform/contact-normalizer.block'
+import { MergeEnrichmentBlock } from './transform/merge-enrichment.block'
 import { CountryConfigBlock } from './countries/country-config.block'
 import { LeadEnrichmentBlock } from './enrichment/lead-enrichment.block'
 import { CSVInterestEnrichmentBlock } from './csv/csv-interest-enrichment.block'
@@ -227,6 +258,22 @@ export function registerAllBuiltInBlocks(): void {
     version: '1.0.0'
   })
 
+  registerBlock('api.fullcontactSearch', FullContactSearchBlock as any, {
+    name: 'FullContact Person Search',
+    description: 'Enrich contacts using FullContact API. Finds Instagram, interests, demographics for B2C data. Cost: ~$0.01-0.05 per lookup.',
+    category: 'api',
+    version: '1.0.0',
+    supportsMock: true
+  })
+
+  registerBlock('api.pdlSearch', PDLSearchBlock as any, {
+    name: 'People Data Labs Person Search',
+    description: 'Enrich contacts using PDL API. Finds LinkedIn, skills, experience for B2B data. Use as fallback when FullContact fails. Cost: ~$0.01-0.03 per lookup.',
+    category: 'api',
+    version: '1.0.0',
+    supportsMock: true
+  })
+
   // AI Blocks
   registerBlock('ai.openrouter', OpenRouterBlock as any, {
     name: 'OpenRouter LLM',
@@ -247,6 +294,14 @@ export function registerAllBuiltInBlocks(): void {
     description: 'Infers interests from social media data',
     category: 'ai',
     version: '1.0.0'
+  })
+
+  registerBlock('ai.llmMergeInterests', LLMMergeInterestsBlock as any, {
+    name: 'AI LLM Merge Interests',
+    description: 'Merges interests from FullContact (B2C) and PDL (B2B) using LLM. Performs intelligent deduplication and combines similar items. Cost: ~$0.01 per merge.',
+    category: 'ai',
+    version: '1.0.0',
+    supportsMock: true
   })
 
   registerBlock('ai.sentimentAnalysis', SentimentAnalysisBlock as any, {
@@ -291,6 +346,14 @@ export function registerAllBuiltInBlocks(): void {
     description: 'Normalizes contact data by extracting name parts, cleaning phone numbers, and standardizing email and date formats.',
     category: 'transform',
     version: '1.0.0'
+  })
+
+  registerBlock('transform.mergeEnrichment', MergeEnrichmentBlock as any, {
+    name: 'Merge Enrichment Data',
+    description: 'Combines enrichment data from FullContact and PDL into unified bio data structure. Prioritizes FullContact (B2C) over PDL (B2B).',
+    category: 'transform',
+    version: '1.0.0',
+    supportsMock: true
   })
 
   // Country Blocks

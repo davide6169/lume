@@ -10,6 +10,13 @@
  * Actor: supreme_coder/linkedin-profile-scraper
  * Cost: ~$0.003 per search ($3/1000 profiles)
  * Note: NO LinkedIn cookie required
+ *
+ * IMPORTANT NOTES:
+ * - Input format: uses `urls: [profileUrl]` array (not `url` or `startUrls`)
+ * - Profile URL format: https://www.linkedin.com/in/firstname-lastname
+ * - Timeout: 300 seconds (5 minutes) per profile
+ * - If you get "Monthly usage hard limit exceeded", your Apify plan
+ *   has reached the monthly limit. Wait for monthly reset or upgrade plan.
  */
 
 import { BaseBlockExecutor } from '../../registry'
@@ -233,22 +240,27 @@ export class LinkedInSearchBlock extends BaseBlockExecutor {
     const actor = config.actor || 'supreme_coder/linkedin-profile-scraper'
     const actorId = actor.includes('~') ? actor : actor.replace('/', '~')
 
-    // Build search query from contact data
-    const searchQuery = this.buildSearchQuery(contact)
+    // Build LinkedIn profile URL from contact data
+    const profileUrl = this.buildProfileUrl(contact)
+
+    if (!profileUrl) {
+      return {
+        found: false,
+        error: 'Could not build LinkedIn profile URL from contact data'
+      }
+    }
 
     try {
       // Start Apify actor run
       this.log(context, 'debug', 'Starting Apify LinkedIn scraper', {
         email: contact.email,
-        query: searchQuery
+        profileUrl
       })
 
       const requestBody = {
-        profileUrls: [],
-        profileUrl: '',
+        urls: [profileUrl],
         resultsType: 'people',
-        maxResults: config.maxResults || 1,
-        searchQuery: searchQuery
+        maxResults: config.maxResults || 1
       }
 
       const response = await fetch(`${baseUrl}/acts/${actorId}/runs`, {
@@ -263,7 +275,9 @@ export class LinkedInSearchBlock extends BaseBlockExecutor {
       const responseData = await response.json()
 
       if (!response.ok) {
-        throw new Error(`Apify API error: ${responseData.message || response.statusText}`)
+        const errorMessage = responseData.message || responseData.error?.message || response.statusText
+        const errorDetails = responseData.error || {}
+        throw new Error(`Apify API error: ${errorMessage} | Details: ${JSON.stringify(errorDetails)}`)
       }
 
       const run = responseData.data
@@ -276,7 +290,9 @@ export class LinkedInSearchBlock extends BaseBlockExecutor {
 
       const completedRun = await this.waitForRun(config.apiToken, run.id, actorId)
 
-      if (!completedRun.datasetId) {
+      // Apify returns defaultDatasetId, not datasetId
+      const datasetId = completedRun.datasetId || completedRun.defaultDatasetId
+      if (!datasetId) {
         return {
           found: false,
           error: 'No dataset returned from Apify'
@@ -284,7 +300,7 @@ export class LinkedInSearchBlock extends BaseBlockExecutor {
       }
 
       // Fetch results
-      const items = await this.fetchDataset(config.apiToken, completedRun.datasetId)
+      const items = await this.fetchDataset(config.apiToken, datasetId)
 
       if (!items || items.length === 0) {
         return {
@@ -298,7 +314,7 @@ export class LinkedInSearchBlock extends BaseBlockExecutor {
 
       return {
         found: true,
-        url: profileItem.url || profileItem.profileUrl,
+        url: profileItem.url || profileUrl,
         bio: profileItem.about || profileItem.summary || profileItem.bio,
         headline: profileItem.headline || profileItem.title,
         fullName: profileItem.fullName || profileItem.name,
@@ -324,24 +340,28 @@ export class LinkedInSearchBlock extends BaseBlockExecutor {
   }
 
   /**
-   * Build LinkedIn search query from contact data
+   * Build LinkedIn profile URL from contact data
+   * Creates URL like: https://www.linkedin.com/in/firstname-lastname
    */
-  private buildSearchQuery(contact: any): string {
-    const parts: string[] = []
-
-    if (contact.nome) {
-      parts.push(contact.nome)
+  private buildProfileUrl(contact: any): string | null {
+    if (!contact.nome) {
+      return null
     }
 
-    if (contact.email) {
-      // Extract domain from email
-      const domain = contact.email.split('@')[1]
-      if (domain) {
-        parts.push(domain)
-      }
+    // Normalize name: lowercase, remove accents, convert to hyphenated format
+    const normalized = contact.nome
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-z\s]/g, '') // Remove non-letters
+      .trim()
+      .replace(/\s+/g, '-') // Convert spaces to hyphens
+
+    if (normalized.length < 3) {
+      return null
     }
 
-    return parts.join(' ')
+    return `https://www.linkedin.com/in/${normalized}`
   }
 
   /**
@@ -402,13 +422,20 @@ export class LinkedInSearchBlock extends BaseBlockExecutor {
 
       const batch = await response.json()
 
-      if (!batch.items || batch.items.length === 0) {
+      // Apify returns either:
+      // 1. An array directly (when items exist)
+      // 2. An object with {items: [...], total: ...} (paginated)
+      const batchItems = Array.isArray(batch) ? batch : (batch.items || [])
+
+      if (batchItems.length === 0) {
         break
       }
 
-      items.push(...batch.items)
+      items.push(...batchItems)
 
-      if (batch.items.length < limit) {
+      // If we got less than the limit, we're on the last page
+      // Or if batch is an object with items, check pagination
+      if (batchItems.length < limit || (Array.isArray(batch) && batch.length < limit)) {
         break // Last page
       }
 

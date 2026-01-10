@@ -303,6 +303,26 @@ export const Caches = {
     maxSize: 100,
     defaultTTL: 5 * 60 * 1000, // 5 minutes
     cleanupInterval: 60 * 1000 // 1 minute
+  }),
+
+  /**
+   * FullContact Cache - 7 day TTL
+   * Consumer profiles change moderately
+   */
+  fullcontact: () => new Cache({
+    maxSize: 1000,
+    defaultTTL: 7 * 24 * 60 * 60 * 1000, // 7 days
+    cleanupInterval: 24 * 60 * 60 * 1000 // 1 day
+  }),
+
+  /**
+   * People Data Labs Cache - 30 day TTL
+   * Professional data is very stable
+   */
+  pdl: () => new Cache({
+    maxSize: 1000,
+    defaultTTL: 30 * 24 * 60 * 60 * 1000, // 30 days
+    cleanupInterval: 7 * 24 * 60 * 60 * 1000 // 1 week
   })
 }
 

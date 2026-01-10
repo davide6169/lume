@@ -163,9 +163,24 @@ export function createBlockExecutor(type: string): BlockExecutor {
  */
 export abstract class BaseBlockExecutor implements BlockExecutor {
   protected readonly type: string
+  static supportsMock: boolean = false // Override in subclasses to declare mock support
 
   constructor(type?: string) {
     this.type = type || this.constructor.name.replace('Block', '')
+  }
+
+  /**
+   * Check if this block supports mock mode
+   */
+  supportsMockMode(): boolean {
+    return (this.constructor as any).supportsMock === true
+  }
+
+  /**
+   * Check if block is enabled via config
+   */
+  isEnabled(config: any): boolean {
+    return config.enabled !== false
   }
 
   /**
@@ -362,4 +377,44 @@ export function initializeBuiltInBlocks(): void {
   // registerBlock('output.csv', CSVOutputBlock, { ... })
 
   console.log(`[BlockRegistry] Registered ${blockRegistry.list().length} block types`)
+}
+
+/**
+ * Validate that all blocks in workflow support mock mode
+ * Used to enforce strict mock mode validation (Soluzione 2)
+ */
+export function validateMockSupport(workflow: any): {
+  valid: boolean
+  unsupportedBlocks: string[]
+} {
+  const unsupportedBlocks: string[] = []
+
+  if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
+    return { valid: true, unsupportedBlocks: [] }
+  }
+
+  for (const node of workflow.nodes) {
+    // Skip disabled blocks - they don't need mock support
+    if (node.config && node.config.enabled === false) {
+      continue
+    }
+
+    const executor = blockRegistry.create(node.type)
+    if (executor && !executor.supportsMockMode()) {
+      unsupportedBlocks.push(`${node.id} (${node.type})`)
+    }
+  }
+
+  return {
+    valid: unsupportedBlocks.length === 0,
+    unsupportedBlocks
+  }
+}
+
+/**
+ * Check if a specific block type supports mock mode
+ */
+export function blockSupportsMock(blockType: string): boolean {
+  const executor = blockRegistry.create(blockType)
+  return executor ? executor.supportsMockMode() : false
 }

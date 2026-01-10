@@ -174,3 +174,4 @@ coverage/
 .pnpm-store
 enriched-contacts.csv
 test-configs/real-world/*.json
+*.csv
