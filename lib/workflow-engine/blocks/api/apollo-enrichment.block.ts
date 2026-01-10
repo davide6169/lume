@@ -11,6 +11,7 @@ import type { Contact } from '@/types'
 
 // Import the existing service
 import { ApolloEnrichmentService } from '@/lib/services/apollo-enrichment'
+import { MockDataGenerator } from '../../utils/mock-data-generator'
 
 export interface ApolloEnrichmentConfig {
   apiToken: string // {{secrets.apollo}}
@@ -18,6 +19,7 @@ export interface ApolloEnrichmentConfig {
   revealPersonalEmails?: boolean // Default: true
   revealPhoneNumbers?: boolean // Default: true
   batchSize?: number // Default: 10 (max)
+  mock?: boolean // Enable mock mode for testing
 }
 
 /**
@@ -37,15 +39,49 @@ export class ApolloEnrichmentBlock extends BaseBlockExecutor {
 
     try {
       this.log(context, 'info', 'Executing Apollo Enrichment block', {
-        contactsCount: config.contacts?.length || 0
+        contactsCount: config.contacts?.length || 0,
+        mock: config.mock || false
       })
 
       // Validate config
-      if (!config.apiToken) {
-        throw new Error('Apollo API token is required')
-      }
       if (!config.contacts || !Array.isArray(config.contacts)) {
         throw new Error('Contacts array is required')
+      }
+
+      // Mock mode - skip API calls
+      if (config.mock) {
+        this.log(context, 'info', '🧪 MOCK MODE: Simulating Apollo enrichment without API calls')
+
+        // Simulate API latency
+        await MockDataGenerator.simulateLatency(200, 800)
+
+        const mockResult = MockDataGenerator.generateApolloEnrichment(config.contacts)
+
+        this.log(context, 'info', 'Apollo Enrichment block completed (MOCK)', {
+          executionTime: Date.now() - startTime,
+          successful: mockResult.metadata.successfulEnrichments,
+          cost: mockResult.metadata.cost
+        })
+
+        return {
+          status: 'completed',
+          output: mockResult,
+          executionTime: Date.now() - startTime,
+          error: undefined,
+          retryCount: 0,
+          startTime,
+          endTime: Date.now(),
+          metadata: {
+            ...mockResult.metadata,
+            mock: true
+          },
+          logs: []
+        }
+      }
+
+      // Real API mode
+      if (!config.apiToken) {
+        throw new Error('Apollo API token is required (unless using mock mode)')
       }
 
       const service = new ApolloEnrichmentService(config.apiToken)
@@ -143,7 +179,8 @@ export class ApolloEnrichmentBlock extends BaseBlockExecutor {
           successfulEnrichments,
           failedEnrichments,
           cost: successfulEnrichments * 0.02, // $0.02 per enrichment
-          currency: 'USD'
+          currency: 'USD',
+          mock: false
         }
       }
 
@@ -165,7 +202,8 @@ export class ApolloEnrichmentBlock extends BaseBlockExecutor {
         metadata: {
           successfulEnrichments,
           failedEnrichments,
-          cost: output.metadata.cost
+          cost: output.metadata.cost,
+          mock: false
         },
         logs: []
       }
