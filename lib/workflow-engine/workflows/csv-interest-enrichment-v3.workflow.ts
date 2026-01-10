@@ -226,9 +226,34 @@ export const csvInterestEnrichmentWorkflowV3: WorkflowDefinition = {
 
   edges: [
     // Layer 0 → Layer 1
-    { id: 'e1', source: 'csv-parse', target: 'country-detect' },
-    { id: 'e2', source: 'csv-parse', target: 'email-classify' },
-    { id: 'e3', source: 'csv-parse', target: 'contact-normalize' },
+    // EDGE ADAPTERS: Map CSV parser output (rows) to block inputs (contacts)
+    {
+      id: 'e1',
+      source: 'csv-parse',
+      target: 'country-detect',
+      adapter: {
+        type: 'map',
+        mapping: { contacts: 'rows' }
+      }
+    },
+    {
+      id: 'e2',
+      source: 'csv-parse',
+      target: 'email-classify',
+      adapter: {
+        type: 'map',
+        mapping: { contacts: 'rows' }
+      }
+    },
+    {
+      id: 'e3',
+      source: 'csv-parse',
+      target: 'contact-normalize',
+      adapter: {
+        type: 'map',
+        mapping: { contacts: 'rows' }
+      }
+    },
 
     // Layer 1 → Layer 2 (FullContact)
     { id: 'e4', source: 'email-classify', target: 'fullcontact-enrich' },

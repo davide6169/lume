@@ -19,6 +19,7 @@ import {
   BlockExecutor
 } from './types'
 import { createBlockExecutor, validateMockSupport } from './registry'
+import { applyEdgeAdapter } from './utils/edge-adapter'
 
 /**
  * Workflow Orchestrator
@@ -418,11 +419,20 @@ export class WorkflowOrchestrator {
 
     if (incomingEdges.length === 1) {
       // Single dependency, use that node's output
-      const sourceNodeId = incomingEdges[0].source
+      const edge = incomingEdges[0]
+      const sourceNodeId = edge.source
       const sourceResult = context.getNodeResult(sourceNodeId)
 
       if (!sourceResult) {
         throw new Error(`Source node ${sourceNodeId} has not been executed`)
+      }
+
+      // Apply edge adapter if present
+      if (edge.adapter) {
+        this.log(context, 'debug', `Applying edge adapter: ${edge.id}`, {
+          adapterType: edge.adapter.type
+        })
+        return applyEdgeAdapter(sourceResult.output, edge.adapter, context)
       }
 
       return sourceResult.output
@@ -438,9 +448,20 @@ export class WorkflowOrchestrator {
         throw new Error(`Source node ${sourceNodeId} has not been executed`)
       }
 
+      // Get the output (possibly adapted)
+      let output = sourceResult.output
+
+      // Apply edge adapter if present
+      if (edge.adapter) {
+        this.log(context, 'debug', `Applying edge adapter: ${edge.id}`, {
+          adapterType: edge.adapter.type
+        })
+        output = applyEdgeAdapter(output, edge.adapter, context)
+      }
+
       // Merge using the port name as key
       const portName = edge.sourcePort || 'out'
-      mergedInput[portName] = sourceResult.output
+      mergedInput[portName] = output
     }
 
     return mergedInput

@@ -33,7 +33,6 @@ export interface CSVParserInput {
 export interface CSVParserOutput {
   headers: string[]
   rows: Array<Record<string, string>>
-  contacts?: Array<Record<string, string>> // Alias for compatibility with downstream blocks
   metadata: {
     totalRows: number
     totalColumns: number
@@ -183,7 +182,6 @@ export class CSVParserBlock extends BaseBlockExecutor {
     return {
       headers,
       rows,
-      contacts: rows, // Alias for compatibility with downstream blocks
       metadata: {
         totalRows: rows.length,
         totalColumns: headers.length,
@@ -208,20 +206,6 @@ export class CSVParserBlock extends BaseBlockExecutor {
     const mockOutput: CSVParserOutput = {
       headers: ['nome', 'celular', 'email', 'nascimento'],
       rows: [
-        {
-          nome: 'Mario Rossi',
-          celular: '3291234567',
-          email: 'mario.rossi@mydomain.com',
-          nascimento: '21/02/1986'
-        },
-        {
-          nome: 'Luca Bianchi',
-          celular: '3282345678',
-          email: 'luca.bianchi@mydomain.com',
-          nascimento: '27/01/1983'
-        }
-      ],
-      contacts: [ // Alias for compatibility with downstream blocks
         {
           nome: 'Mario Rossi',
           celular: '3291234567',

@@ -121,6 +121,50 @@ export interface Condition {
 }
 
 /**
+ * Edge adapter types
+ * - map: Simple field mapping from source to target
+ * - function: Custom transformation function (code string, eval'd in secure context)
+ * - template: Template-based mapping with {{output.field}} syntax
+ */
+export type EdgeAdapterType = 'map' | 'function' | 'template'
+
+/**
+ * Edge adapter definition
+ * Transforms data from source node output to target node input
+ *
+ * Examples:
+ * - Map: { contacts: '{{output.rows}}' }
+ * - Function: '(output) => ({ contacts: output.rows })'
+ */
+export interface EdgeAdapter {
+  type: EdgeAdapterType
+
+  // For 'map' type: simple field mappings
+  // { targetField: 'sourceField' } or { targetField: '{{output.sourceField}}' }
+  mapping?: Record<string, string>
+
+  // For 'function' type: JavaScript code (evaluated in secure sandbox)
+  function?: string // '(output) => ({ contacts: output.rows })'
+
+  // For 'template' type: template-based mapping
+  template?: Record<string, string>
+}
+
+/**
+ * Edge definition - connects nodes in the workflow DAG
+ * Now supports adapters for data transformation between nodes
+ */
+export interface EdgeDefinition {
+  id: string
+  source: string // source node ID
+  target: string // target node ID
+  sourcePort?: string // output port name (default: 'out')
+  targetPort?: string // input port name (default: 'in')
+  condition?: Condition // conditional routing
+  adapter?: EdgeAdapter // transform output → input
+}
+
+/**
  * Filter block configuration
  */
 export interface FilterConfig extends BlockConfig {

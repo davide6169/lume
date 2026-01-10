@@ -6,6 +6,7 @@
  * - Rate limiting with token bucket
  * - Circuit breaker pattern
  * - Cache with TTL and LRU eviction
+ * - Edge adapters for data transformation between nodes
  */
 
 export {
@@ -52,3 +53,8 @@ export type {
   CacheConfig,
   CacheStats
 } from './cache'
+
+export {
+  applyEdgeAdapter,
+  validateAdapter
+} from './edge-adapter'
