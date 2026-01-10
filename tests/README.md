@@ -8,6 +8,7 @@ This directory contains all test files for the Lume project.
 tests/
 ├── workflow-engine/              # Workflow Engine Tests
 │   ├── test-csv-workflow-direct.ts
+│   ├── test-csv-workflow-real-mock.ts
 │   ├── test-deep-merge.ts
 │   ├── test-edge-adapter.ts
 │   ├── test-merge-functions.ts
@@ -68,6 +69,7 @@ These tests validate the core workflow engine functionality:
 | Test File | Purpose |
 |-----------|---------|
 | `test-csv-workflow-direct.ts` | Integration test for CSV Interest Enrichment workflow |
+| `test-csv-workflow-real-mock.ts` | Real mock test with 5 contacts, FullContact only |
 | `test-deep-merge.ts` | Unit tests for deep merge function |
 | `test-edge-adapter.ts` | Tests for edge adapter functionality |
 | `test-merge-functions.ts` | Unit tests for merge functions |

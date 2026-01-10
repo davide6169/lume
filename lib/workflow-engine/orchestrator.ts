@@ -206,14 +206,18 @@ export class WorkflowOrchestrator {
       const endTime = Date.now()
       const executionTime = endTime - startTime
 
-      // Get output from output nodes
-      const outputNodes = workflow.nodes.filter(n => n.type === 'output')
-      const outputs: any = {}
+      // Get output from terminal nodes (nodes with no outgoing edges)
+      // Terminal nodes are nodes that are not the source of any edge
+      const terminalNodeIds = new Set(workflow.nodes.map(n => n.id))
+      for (const edge of workflow.edges) {
+        terminalNodeIds.delete(edge.source)
+      }
 
-      for (const outputNode of outputNodes) {
-        const result = context.getNodeResult(outputNode.id)
+      const outputs: any = {}
+      for (const nodeId of terminalNodeIds) {
+        const result = context.getNodeResult(nodeId)
         if (result) {
-          outputs[outputNode.id] = result.output
+          outputs[nodeId] = result.output
         }
       }
 
