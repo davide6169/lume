@@ -22,6 +22,101 @@ import { createBlockExecutor, validateMockSupport } from './registry'
 import { applyEdgeAdapter } from './utils/edge-adapter'
 
 /**
+ * Deep merge utility for combining multiple objects
+ * Merges nested objects recursively, arrays are concatenated
+ */
+function deepMerge(target: any, source: any): any {
+  if (source === null || source === undefined) {
+    return target
+  }
+  if (typeof source !== 'object' || typeof target !== 'object') {
+    return source
+  }
+
+  // Handle arrays: concatenate
+  if (Array.isArray(source) && Array.isArray(target)) {
+    return [...target, ...source]
+  }
+
+  // Handle objects: merge recursively
+  const result = { ...target }
+
+  for (const key of Object.keys(source)) {
+    if (source[key] !== undefined && key in target) {
+      result[key] = deepMerge(target[key], source[key])
+    } else {
+      result[key] = source[key]
+    }
+  }
+
+  return result
+}
+
+/**
+ * Smart merge for workflow data - handles arrays with ID-based merging
+ * If arrays contain objects with 'id' field, merge by ID instead of concatenating
+ */
+function smartMerge(target: any, source: any): any {
+  if (source === null || source === undefined) {
+    return target
+  }
+  if (typeof source !== 'object' || typeof target !== 'object') {
+    return source
+  }
+
+  // Special handling for 'contacts' or 'items' arrays
+  // These often contain objects that should be merged by 'id' or 'email'
+  for (const arrayKey of ['contacts', 'items', 'rows']) {
+    if (source[arrayKey] && target[arrayKey] &&
+        Array.isArray(source[arrayKey]) && Array.isArray(target[arrayKey])) {
+
+      const targetArray = target[arrayKey] as any[]
+      const sourceArray = source[arrayKey] as any[]
+
+      // Check if items have 'id' field for smart merging
+      const hasIds = targetArray.some(item => item.id !== undefined) ||
+                     sourceArray.some(item => item.id !== undefined)
+
+      if (hasIds) {
+        // Merge by ID
+        const mergedArray = [...targetArray]
+        const idMap = new Map(targetArray.map(item => [item.id, item]))
+
+        for (const sourceItem of sourceArray) {
+          const id = sourceItem.id
+          if (idMap.has(id)) {
+            // Deep merge existing item
+            const existingItem = idMap.get(id)
+            const mergedItem = deepMerge(existingItem, sourceItem)
+            // Replace in array
+            const index = mergedArray.findIndex(item => item.id === id)
+            if (index !== -1) {
+              mergedArray[index] = mergedItem
+            }
+          } else {
+            // Add new item
+            mergedArray.push(sourceItem)
+          }
+        }
+
+        // Create a new source without the array key to avoid overwriting
+        const sourceWithoutArray = { ...source }
+        delete sourceWithoutArray[arrayKey]
+
+        // Deep merge everything except the array (which we already merged)
+        return deepMerge(
+          { ...target, [arrayKey]: mergedArray },
+          sourceWithoutArray
+        )
+      }
+    }
+  }
+
+  // Default: use regular deep merge
+  return deepMerge(target, source)
+}
+
+/**
  * Workflow Orchestrator
  * Manages execution of workflow DAGs with parallel processing
  */
@@ -438,8 +533,15 @@ export class WorkflowOrchestrator {
       return sourceResult.output
     }
 
-    // Multiple dependencies (merge node)
-    const mergedInput: any = {}
+    // Multiple dependencies - DEEP MERGE all inputs
+    this.log(context, 'debug', `Merging inputs from ${incomingEdges.length} sources`, {
+      targetNode: node.id,
+      sources: incomingEdges.map(e => e.source)
+    })
+
+    let mergedInput: any = {}
+    const sourcePortOutputs: Record<string, any> = {}
+
     for (const edge of incomingEdges) {
       const sourceNodeId = edge.source
       const sourceResult = context.getNodeResult(sourceNodeId)
@@ -459,10 +561,28 @@ export class WorkflowOrchestrator {
         output = applyEdgeAdapter(output, edge.adapter, context)
       }
 
-      // Merge using the port name as key
+      // Store by source port for explicit access if needed
       const portName = edge.sourcePort || 'out'
-      mergedInput[portName] = output
+      sourcePortOutputs[portName] = output
+
+      // SMART MERGE into main input (merges arrays by ID when possible)
+      mergedInput = smartMerge(mergedInput, output)
+
+      this.log(context, 'debug', `Merged output from ${sourceNodeId}`, {
+        mergedKeys: Object.keys(mergedInput)
+      })
     }
+
+    // Also make source outputs available by port name for backward compatibility
+    if (Object.keys(sourcePortOutputs).length > 1) {
+      // Only add sourcePortOutputs if there are multiple different ports
+      mergedInput._sourcePorts = sourcePortOutputs
+    }
+
+    this.log(context, 'debug', `Final merged input for ${node.id}`, {
+      keys: Object.keys(mergedInput),
+      hasSourcePorts: !!mergedInput._sourcePorts
+    })
 
     return mergedInput
   }

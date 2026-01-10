@@ -1589,6 +1589,179 @@ app/
 
 ---
 
+## 🔬 NOVITÀ RECENTI (11 Gennaio 2026)
+
+### Smart Merge per Multipli Incoming Edges ✅
+
+Implementato lo **smart merge** nell'orchestrator per gestire nodi con più incoming edges senza perdita di dati.
+
+#### Il Problema Risolto
+
+Quando un nodo riceve input da più source con lo stesso `sourcePort`, i dati venivano sovrascritti invece che mergiati:
+
+```typescript
+// VECCHIO COMPORTAMENTO (BUG):
+for (const edge of incomingEdges) {
+  const portName = edge.sourcePort || 'out'  // = 'out' per tutti
+  mergedInput[portName] = output  // → SOVRASCRIVE!
+}
+```
+
+#### La Soluzione: Smart Merge
+
+**1. Deep Merge** - Merge ricorsivo di oggetti
+```typescript
+function deepMerge(target: any, source: any): any {
+  // Merge nested objects recursively
+  // Concatenate arrays
+  // Preserve all keys
+}
+```
+
+**2. Smart Merge** - Merge intelligente per array con ID
+```typescript
+function smartMerge(target: any, source: any): any {
+  // Per array con ID (contacts, items, rows):
+  // - Merge items con lo stesso ID
+  // - Aggiunge nuovi items
+  // - Preserva tutti i campi
+}
+```
+
+#### Test Results
+
+✅ **Test 1**: Simple objects - Tutti i chiavi preservate
+✅ **Test 2**: Nested objects - Deep merge funziona
+✅ **Test 3**: Arrays with IDs - Smart merge by ID
+✅ **CSV Workflow**: Nessuna regressione, tutti i nodi completati
+
+#### Esempio Pratico
+
+```javascript
+// Input da email-classify
+{ contacts: [{ id: 1, emailType: "business" }] }
+
+// Input da contact-normalize
+{ contacts: [{ id: 1, normalized: { firstName: "Mario" } }] }
+
+// Smart merge result
+{ contacts: [{
+  id: 1,
+  emailType: "business",      // ← da email-classify
+  normalized: {                // ← da contact-normalize
+    firstName: "Mario"
+  }
+}]}
+```
+
+### Edge Adapters ✅
+
+Implementato **edge adapters** per trasformazioni dati tra blocchi.
+
+#### Architecture
+
+Prima (coupled):
+```
+csv-parser → outputs: { headers, rows, metadata }
+              ↓ workaround: add "contacts: rows" alias
+email-classify → expects: { contacts }
+```
+
+Dopo (decoupled):
+```
+csv-parser → outputs: { headers, rows, metadata }
+              ↓ [EDGE ADAPTER] rows → contacts
+email-classify → expects: { contacts }
+```
+
+#### Tipi di Adapter
+
+**1. Map Adapter** - Mapping campi
+```json
+{
+  "adapter": {
+    "type": "map",
+    "mapping": { "contacts": "rows" }
+  }
+}
+```
+
+**2. Template Adapter** - Template con sintassi `{{field}}`
+```json
+{
+  "adapter": {
+    "type": "template",
+    "template": {
+      "contacts": "{{rows}}",
+      "total": "{{rows.length}}",
+      "timestamp": "{{now}}"
+    }
+  }
+}
+```
+
+**3. Function Adapter** - JavaScript custom
+```json
+{
+  "adapter": {
+    "type": "function",
+    "function": "return { contacts: output.rows, count: output.rows.length };"
+  }
+}
+```
+
+### Mock Mode ✅
+
+Implementato **mock mode** per tutti i blocchi API e utility.
+
+#### Utilizzo
+
+```typescript
+// Blocco dichiara supporto mock
+class MyBlock extends BaseBlockExecutor {
+  static supportsMock = true
+}
+
+// Context con mode demo
+const context = ContextFactory.create({
+  mode: 'demo',  // 'live' | 'mock' | 'demo' | 'test' | 'production'
+  // ...
+})
+
+// Orchestrator valida mock mode prima dell'esecuzione
+```
+
+#### Blocchi con Mock Mode
+
+✅ **API Blocks**: Apify, Apollo, Hunter, FullContact, PDL, OpenRouter
+✅ **Utility Blocks**: CSV parser/assembler, transforms, filters, branch, pass-through
+
+Total: **20+ blocchi** con mock mode
+
+### CLI Tool ✅
+
+Implementato **CLI tool** per interagire con workflow engine da terminale.
+
+#### Funzionalità
+
+```bash
+# Gestione workflow
+npm run workflow list
+npm run workflow get -- --id csv-interest-enrichment
+npm run workflow create -- --file ./workflow.json
+npm run workflow validate -- --file ./workflow.json
+
+# Test blocchi
+npm run workflow blocks list
+npm run workflow blocks test -- --type api.apollo --config ./test.json
+
+# Esecuzione workflow
+npm run workflow exec -- --id csv-interest-enrichment --input '{"csv": "..."}'
+npm run workflow executions -- --id csv-interest-enrichment
+```
+
+---
+
 ## Note Aggiuntive
 
 ### Considerazioni Importanti

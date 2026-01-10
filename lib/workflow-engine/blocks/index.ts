@@ -211,6 +211,8 @@ import { LeadEnrichmentBlock } from './enrichment/lead-enrichment.block'
 import { CSVInterestEnrichmentBlock } from './csv/csv-interest-enrichment.block'
 import { CSVParserBlock } from './csv/csv-parser.block'
 import { CSVAssemblerBlock } from './csv/csv-assembler.block'
+import { StaticInputBlock, DatabaseInputBlock } from './input/static-input.block'
+import { LoggerOutputBlock } from './output/logger-output.block'
 
 export function registerAllBuiltInBlocks(): void {
   // API Blocks
@@ -404,6 +406,31 @@ export function registerAllBuiltInBlocks(): void {
     description: 'Assemble final CSV with interests column. Filters out rows without interests. Generates CSV string output.',
     category: 'csv',
     version: '1.0.0'
+  })
+
+  // Input/Output Blocks
+  registerBlock('input.static', StaticInputBlock as any, {
+    name: 'Static Input',
+    description: 'Returns static data defined in config. Useful for testing and demo workflows.',
+    category: 'input',
+    version: '1.0.0',
+    supportsMock: true
+  })
+
+  registerBlock('input.database', DatabaseInputBlock as any, {
+    name: 'Database Input',
+    description: 'Reads data from database based on query. (Not yet implemented)',
+    category: 'input',
+    version: '1.0.0',
+    supportsMock: true
+  })
+
+  registerBlock('output.logger', LoggerOutputBlock as any, {
+    name: 'Logger Output',
+    description: 'Logs data to console. Useful for testing and debugging.',
+    category: 'output',
+    version: '1.0.0',
+    supportsMock: true
   })
 
   console.log('[WorkflowEngine] All built-in blocks registered successfully')
