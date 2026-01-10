@@ -4,7 +4,7 @@
   "input": {},
   "config": {
     "mode": "live",
-    "model": "google/gemma-2-27b-it:free",
+    "model": "google/gemma-2-27b-it",
     "maxInterests": 10,
     "data": [
       {

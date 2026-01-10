@@ -18,7 +18,7 @@
     "mode": "live",
     "enableLinkedIn": true,
     "enableInstagram": true,
-    "llmModel": "google/gemma-2-27b-it:free",
+    "llmModel": "google/gemma-2-27b-it",
     "maxCostPerContact": 0.10
   },
   "secrets": {},
