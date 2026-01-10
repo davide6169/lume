@@ -60,6 +60,8 @@ export interface ContactNormalizerOutput {
  * Contact Normalizer Block
  */
 export class ContactNormalizerBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('transform.contactNormalize')
   }

@@ -75,6 +75,8 @@ export interface HasBioDataFilterOutput {
  * Bio Data Filter Block
  */
 export class HasBioDataFilterBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('filter.hasBioData')
   }

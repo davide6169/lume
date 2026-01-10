@@ -74,6 +74,8 @@ const DEFAULT_PERSONAL_DOMAINS = [
  * Email Classifier Block
  */
 export class EmailClassifierBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('transform.emailClassify')
   }

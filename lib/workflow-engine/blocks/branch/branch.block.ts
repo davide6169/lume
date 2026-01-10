@@ -20,6 +20,8 @@ export interface BranchConfig {
  * Branch Block Executor
  */
 export class BranchBlock extends BaseBlockExecutor {
+  static supportsMock = true // Flow control block - no API calls, works in all modes
+
   constructor() {
     super('branch')
   }

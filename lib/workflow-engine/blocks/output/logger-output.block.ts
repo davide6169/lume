@@ -17,6 +17,8 @@ export interface LoggerOutputConfig {
  * Logger Output Block Executor
  */
 export class LoggerOutputBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('output.logger')
   }

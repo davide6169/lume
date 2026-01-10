@@ -1,0 +1,9 @@
+{
+  "input": {
+    "csv": "nome;celular;email;nascimento\nMario Rossi;;mario.rossi@example.com;1985-03-15\nGiulia Bianchi;;giulia.b@email.com;1990-07-22\nMarco Verdi;;marco.verdi@company.it;1988-11-30"
+  },
+  "variables": {
+    "_enablePDL": false
+  },
+  "secrets": {}
+}

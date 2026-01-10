@@ -59,6 +59,8 @@ export interface CSVAssemblerOutput {
  * CSV Assembler Block
  */
 export class CSVAssemblerBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('csv.assembler')
   }

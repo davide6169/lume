@@ -15,6 +15,8 @@ export interface FieldMappingConfig {
  * Field Mapping Block Executor
  */
 export class FieldMappingBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('transform.fieldMapping')
   }

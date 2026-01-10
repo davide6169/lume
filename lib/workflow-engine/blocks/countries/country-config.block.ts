@@ -379,6 +379,8 @@ export interface CountryConfigOutput {
  * country-specific configuration for downstream blocks.
  */
 export class CountryConfigBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('countries.config')
   }

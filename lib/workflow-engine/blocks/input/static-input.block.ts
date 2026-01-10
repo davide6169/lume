@@ -16,6 +16,8 @@ export interface StaticInputConfig {
  * Static Input Block Executor
  */
 export class StaticInputBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('input.static')
   }
@@ -75,6 +77,8 @@ export class StaticInputBlock extends BaseBlockExecutor {
  * Will be implemented with actual Supabase integration.
  */
 export class DatabaseInputBlock extends BaseBlockExecutor {
+  static supportsMock = true // Utility block - no API calls, works in all modes
+
   constructor() {
     super('input.database')
   }

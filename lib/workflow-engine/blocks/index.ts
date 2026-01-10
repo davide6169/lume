@@ -136,6 +136,10 @@ export {
   type MergeEnrichmentInput
 } from './transform/merge-enrichment.block'
 
+export {
+  PassThroughBlock
+} from './transform/pass-through.block'
+
 // Country Blocks
 export {
   CountryConfigBlock,
@@ -201,6 +205,7 @@ import { BranchBlock } from './branch/branch.block'
 import { EmailClassifierBlock } from './transform/email-classifier.block'
 import { ContactNormalizerBlock } from './transform/contact-normalizer.block'
 import { MergeEnrichmentBlock } from './transform/merge-enrichment.block'
+import { PassThroughBlock } from './transform/pass-through.block'
 import { CountryConfigBlock } from './countries/country-config.block'
 import { LeadEnrichmentBlock } from './enrichment/lead-enrichment.block'
 import { CSVInterestEnrichmentBlock } from './csv/csv-interest-enrichment.block'
@@ -354,6 +359,13 @@ export function registerAllBuiltInBlocks(): void {
     category: 'transform',
     version: '1.0.0',
     supportsMock: true
+  })
+
+  registerBlock('transform.passThrough', PassThroughBlock as any, {
+    name: 'Pass Through',
+    description: 'Passes input through to output without modification. Used for conditional branches.',
+    category: 'transform',
+    version: '1.0.0'
   })
 
   // Country Blocks
