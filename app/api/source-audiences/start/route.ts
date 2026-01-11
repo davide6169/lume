@@ -16,6 +16,9 @@ export async function POST(request: Request) {
   try {
     console.log('[Search Job Start] Request received')
 
+    // Create Supabase client (will be used for non-demo users)
+    const supabase = await createSupabaseServerClient()
+
     // Check if user is authenticated (either demo user or real Supabase user)
     let user: any = null
     let isDemoUser = false
@@ -35,7 +38,6 @@ export async function POST(request: Request) {
 
     // If not demo user, check Supabase auth
     if (!user) {
-      const supabase = await createSupabaseServerClient()
       const {
         data: { user: supabaseUser },
         error: userError,
