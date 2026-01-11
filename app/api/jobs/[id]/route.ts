@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { jobProcessor } from '@/lib/services/job-processor'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { verifyDemoToken } from '@/lib/auth/demo-auth'
 
 export async function GET(
   request: Request,
@@ -10,19 +12,41 @@ export async function GET(
     const { id: jobId } = await params
     console.log(`[Jobs API] GET /api/jobs/${jobId} - Fetching job status`)
 
+    // Create Supabase client (will be used for non-demo users)
     const supabase = await createSupabaseServerClient()
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    // Check if user is authenticated (either demo user or real Supabase user)
+    let user: any = null
+    let isDemoUser = false
 
-    if (userError || !user) {
-      console.error(`[Jobs API] Job ${jobId} - Authentication failed`)
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    // First, check if this is a demo user
+    const cookieStore = await cookies()
+    const demoToken = cookieStore.get('demo_token')?.value
+
+    if (demoToken) {
+      const demoUser = await verifyDemoToken(demoToken)
+      if (demoUser) {
+        console.log(`[Jobs API] Job ${jobId} - Demo user authenticated: ${demoUser.email}`)
+        user = { id: 'demo-user', email: demoUser.email }
+        isDemoUser = true
+      }
     }
 
-    console.log(`[Jobs API] Job ${jobId} - User authenticated: ${user.id}`)
+    // If not demo user, check Supabase auth
+    if (!user) {
+      const {
+        data: { user: supabaseUser },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !supabaseUser) {
+        console.error(`[Jobs API] Job ${jobId} - Authentication failed`)
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      }
+
+      user = supabaseUser
+      console.log(`[Jobs API] Job ${jobId} - User authenticated: ${user.id}`)
+    }
 
     // Get job from processor
     const job = jobProcessor.getJob(jobId)
@@ -73,13 +97,32 @@ export async function DELETE(
   try {
     const supabase = await createSupabaseServerClient()
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    // Check if user is authenticated (either demo user or real Supabase user)
+    let user: any = null
 
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    // First, check if this is a demo user
+    const cookieStore = await cookies()
+    const demoToken = cookieStore.get('demo_token')?.value
+
+    if (demoToken) {
+      const demoUser = await verifyDemoToken(demoToken)
+      if (demoUser) {
+        user = { id: 'demo-user', email: demoUser.email }
+      }
+    }
+
+    // If not demo user, check Supabase auth
+    if (!user) {
+      const {
+        data: { user: supabaseUser },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !supabaseUser) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      }
+
+      user = supabaseUser
     }
 
     const { id: jobId } = await params
