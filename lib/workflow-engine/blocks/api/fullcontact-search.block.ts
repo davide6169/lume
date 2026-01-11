@@ -20,6 +20,7 @@
 import { BaseBlockExecutor } from '../../registry'
 import { Caches, generateCacheKey } from '../../utils/cache'
 import type { ExecutionContext } from '../../types'
+import { writeFile } from 'fs/promises'
 
 // Types
 export interface FullContactSearchConfig {
@@ -267,25 +268,281 @@ export class FullContactSearchBlock extends BaseBlockExecutor {
 
   /**
    * Search FullContact profile using API
-   * NOTE: This is a placeholder implementation
-   * Real API integration to be implemented based on FullContact API docs
+   * FullContact v3 API: https://api.fullcontact.com/v3/person.enrich
+   *
+   * API Documentation:
+   * - Endpoint: POST https://api.fullcontact.com/v3/person.enrich
+   * - Headers: Authorization: Bearer {API_KEY}, Content-Type: application/json
+   * - Body: { "email": "email@example.com" }
+   * - Response: JSON with details.profiles, details.demographics, details.interests
    */
   private async searchProfile(
     config: FullContactSearchConfig,
     contact: any,
     context: ExecutionContext
   ): Promise<FullContactProfileData> {
-    // Placeholder for real FullContact API call
-    // For now, return not found
-    // TODO: Implement actual FullContact API integration
+    const email = contact.email || contact.original?.email
 
-    this.log(context, 'warn', 'FullContact API not yet implemented, returning not found', {
-      email: contact.email
+    if (!email) {
+      return {
+        found: false,
+        error: 'Email not provided'
+      }
+    }
+
+    const apiUrl = 'https://api.fullcontact.com/v3/person.enrich'
+
+    // Build request body
+    const requestBody = {
+      email: email
+    }
+
+    // Prepare request data for logging
+    const requestData = {
+      timestamp: new Date().toISOString(),
+      endpoint: apiUrl,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiToken.substring(0, 10)}...${config.apiToken.substring(Math.max(0, config.apiToken.length - 4))}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: requestBody
+    }
+
+    this.log(context, 'info', '📡 FullContact API Request:', {
+      endpoint: apiUrl,
+      method: 'POST',
+      email: email,
+      body: JSON.stringify(requestBody)
     })
 
-    return {
-      found: false,
-      error: 'FullContact API integration not yet implemented'
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.apiToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(config.timeout || 30000)
+      })
+
+      const statusCode = response.status
+
+      // Read response body
+      let responseBody: any
+      const responseText = await response.text()
+      try {
+        responseBody = JSON.parse(responseText)
+      } catch {
+        responseBody = responseText
+      }
+
+      // Prepare response data for logging
+      const responseData = {
+        timestamp: new Date().toISOString(),
+        status: statusCode,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: responseBody
+      }
+
+      // Save request and response to file
+      const apiLog = {
+        request: requestData,
+        response: responseData
+      }
+
+      await writeFile('/tmp/fullcontact-api-log.json', JSON.stringify(apiLog, null, 2))
+      this.log(context, 'info', '📁 FullContact API log saved to /tmp/fullcontact-api-log.json')
+
+      this.log(context, 'info', `📡 FullContact API Response: ${statusCode}`, {
+        status: statusCode,
+        statusText: response.statusText
+      })
+
+      // Handle 404 - Profile not found
+      if (statusCode === 404) {
+        this.log(context, 'info', 'Profile not found in FullContact', {
+          email: email
+        })
+
+        return {
+          found: false,
+          error: 'Profile not found'
+        }
+      }
+
+      // Handle 401 - Unauthorized
+      if (statusCode === 401) {
+        this.log(context, 'error', 'FullContact API key invalid', {
+          email: email
+        })
+
+        return {
+          found: false,
+          error: 'Invalid API key'
+        }
+      }
+
+      // Handle 429 - Rate limit
+      if (statusCode === 429) {
+        this.log(context, 'error', 'FullContact API rate limit exceeded', {
+          email: email
+        })
+
+        return {
+          found: false,
+          error: 'Rate limit exceeded'
+        }
+      }
+
+      // Handle other errors
+      if (!response.ok) {
+        let errorMessage = `API error: ${statusCode} ${response.statusText}`
+        if (typeof responseBody === 'object' && responseBody !== null) {
+          errorMessage = `API error: ${JSON.stringify(responseBody, null, 2)}`
+        }
+
+        this.log(context, 'error', 'FullContact API error', {
+          status: statusCode,
+          statusText: response.statusText,
+          email: email,
+          errorMessage: errorMessage
+        })
+
+        return {
+          found: false,
+          error: errorMessage
+        }
+      }
+
+      // Parse successful response (already parsed in responseBody)
+      const data = responseBody
+
+      this.log(context, 'info', '✅ FullContact profile found', {
+        email: email,
+        data: JSON.stringify(data, null, 2)
+      })
+
+      // Extract relevant data from FullContact response
+      const profileData: FullContactProfileData = {
+        found: true
+      }
+
+      // Extract social profiles from data.details.profiles (can be array or object)
+      // Also check for direct fields at root level (twitter, linkedin, facebook)
+      const profiles: any = {}
+
+      // Check direct fields at root level (present in v3 API response)
+      if (data.twitter) profiles.twitter = data.twitter
+      if (data.linkedin) profiles.linkedin = data.linkedin
+      if (data.facebook) profiles.facebook = data.facebook
+      if (data.instagram) profiles.instagram = data.instagram
+
+      // Check data.details.profiles (can be array or object)
+      if (data.details?.profiles) {
+        const detailsProfiles = data.details.profiles
+
+        // Handle array format
+        if (Array.isArray(detailsProfiles)) {
+          detailsProfiles.forEach((profile: any) => {
+            const id = profile.id || ''
+            const username = profile.username || ''
+
+            if (profile.type === 'instagram' && username) {
+              profiles.instagram = username
+            } else if (profile.type === 'twitter' && username) {
+              profiles.twitter = username
+            } else if (profile.type === 'linkedin' && (id || username)) {
+              profiles.linkedin = id || username
+            } else if (profile.type === 'facebook' && (id || username)) {
+              profiles.facebook = id || username
+            }
+          })
+        }
+        // Handle object format (keys are social network types)
+        else if (typeof detailsProfiles === 'object' && detailsProfiles !== null) {
+          for (const [network, profileData] of Object.entries(detailsProfiles)) {
+            if (profileData && typeof profileData === 'object') {
+              const profile = profileData as any
+              if (network === 'instagram' && profile.username) {
+                profiles.instagram = profile.username
+              } else if (network === 'twitter' && profile.username) {
+                profiles.twitter = profile.username
+              } else if (network === 'linkedin' && (profile.id || profile.username)) {
+                profiles.linkedin = profile.id || profile.username
+              } else if (network === 'facebook' && (profile.id || profile.username)) {
+                profiles.facebook = profile.id || profile.username
+              }
+            }
+          }
+        }
+      }
+
+      if (Object.keys(profiles).length > 0) {
+        profileData.profiles = profiles
+      }
+
+      // Extract demographics from data.details.demographics
+      if (data.details?.demographics) {
+        const demographics: any = {}
+
+        if (data.details.demographics.locationGeneral) {
+          demographics.location = data.details.demographics.locationGeneral
+        }
+
+        if (data.details.demographics.gender) {
+          demographics.gender = data.details.demographics.gender
+        }
+
+        if (data.details.demographics.ageRange) {
+          demographics.age = `${data.details.demographics.ageRange.start}-${data.details.demographics.ageRange.end}`
+        }
+
+        if (data.details.demographics.country) {
+          demographics.country = data.details.demographics.country
+        }
+
+        if (Object.keys(demographics).length > 0) {
+          profileData.demographics = demographics
+        }
+      }
+
+      // Extract interests from data.details.interests
+      if (data.details?.interests) {
+        const interests: string[] = []
+
+        if (Array.isArray(data.details.interests)) {
+          data.details.interests.forEach((interest: any) => {
+            if (typeof interest === 'string') {
+              interests.push(interest)
+            } else if (interest.name) {
+              interests.push(interest.name)
+            }
+          })
+        }
+
+        if (interests.length > 0) {
+          profileData.interests = interests
+        }
+      }
+
+      return profileData
+
+    } catch (error) {
+      // Handle fetch errors (timeout, network, etc.)
+      this.log(context, 'error', 'FullContact API request failed', {
+        email: email,
+        error: (error as Error).message
+      })
+
+      return {
+        found: false,
+        error: `Request failed: ${(error as Error).message}`
+      }
     }
   }
 

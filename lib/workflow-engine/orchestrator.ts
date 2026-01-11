@@ -20,6 +20,7 @@ import {
 } from './types'
 import { createBlockExecutor, validateMockSupport } from './registry'
 import { applyEdgeAdapter } from './utils/edge-adapter'
+import { VariableInterpolator } from './context'
 
 /**
  * Deep merge utility for combining multiple objects
@@ -625,6 +626,9 @@ export class WorkflowOrchestrator {
     const startTime = Date.now()
 
     try {
+      // Interpolate config variables ({{secrets.*}}, {{variables.*}}, etc.)
+      const interpolatedConfig = VariableInterpolator.interpolateObject(config, context, input)
+
       // Create a timeout promise
       const timeoutPromise = new Promise<ExecutionResult>((_, reject) =>
         setTimeout(() => reject(new Error(`Execution timeout after ${timeout}ms`)), timeout)
@@ -632,7 +636,7 @@ export class WorkflowOrchestrator {
 
       // Execute with timeout
       const result = await Promise.race([
-        executor.execute(config, input, context),
+        executor.execute(interpolatedConfig, input, context),
         timeoutPromise
       ])
 
