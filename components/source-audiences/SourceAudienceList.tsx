@@ -640,8 +640,19 @@ export function SourceAudienceList() {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('Error starting job:', errorText)
-        throw new Error('Failed to start search job')
+        console.error('[Frontend] Error starting job:', response.status, errorText)
+
+        // Try to parse error message from response
+        let errorMessage = 'Failed to start search job'
+        try {
+          const errorData = JSON.parse(errorText)
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          // If not JSON, use status text
+          errorMessage = `${response.status}: ${response.statusText || 'Unknown error'}`
+        }
+
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
@@ -664,8 +675,9 @@ export function SourceAudienceList() {
       // Start polling job status
       pollJobStatus(newJobId)
     } catch (error) {
-      console.error('Error starting search:', error)
-      addToast('Search Failed', 'Failed to start search job', 'destructive')
+      console.error('[Frontend] Error starting search:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start search job'
+      addToast('Search Failed', errorMessage, 'destructive')
       setIsSearching(false)
       setJobId(null)
       setJobProgress(0)

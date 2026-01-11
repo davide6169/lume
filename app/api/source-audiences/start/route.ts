@@ -9,27 +9,49 @@ import { createOpenRouterService } from '@/lib/services/openrouter'
 import { createMixedbreadService } from '@/lib/services/mixedbread'
 import { ApifyScraperService } from '@/lib/services/apify-scraper'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { verifyDemoToken } from '@/lib/auth/demo-auth'
 
 export async function POST(request: Request) {
   try {
     console.log('[Search Job Start] Request received')
 
-    const supabase = await createSupabaseServerClient()
+    // Check if user is authenticated (either demo user or real Supabase user)
+    let user: any = null
+    let isDemoUser = false
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    // First, check if this is a demo user
+    const cookieStore = await cookies()
+    const demoToken = cookieStore.get('demo_token')?.value
 
-    if (userError || !user) {
-      console.error('[Search Job Start] Authentication failed:', userError)
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (demoToken) {
+      const demoUser = await verifyDemoToken(demoToken)
+      if (demoUser) {
+        console.log('[Search Job Start] Demo user authenticated:', demoUser.email)
+        user = { id: 'demo-user', email: demoUser.email }
+        isDemoUser = true
+      }
     }
 
-    console.log('[Search Job Start] User authenticated:', user.id)
+    // If not demo user, check Supabase auth
+    if (!user) {
+      const supabase = await createSupabaseServerClient()
+      const {
+        data: { user: supabaseUser },
+        error: userError,
+      } = await supabase.auth.getUser()
 
-    // Ensure profile exists
-    await ensureProfileExists(user.id, user.email)
+      if (userError || !supabaseUser) {
+        console.error('[Search Job Start] Authentication failed:', userError)
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      }
+
+      user = supabaseUser
+      console.log('[Search Job Start] Supabase user authenticated:', user.id)
+
+      // Ensure profile exists for real users
+      await ensureProfileExists(user.id, user.email)
+    }
 
     const body = await request.json()
     console.log('[Search Job Start] Request body:', JSON.stringify(body, null, 2))
