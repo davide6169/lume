@@ -193,7 +193,8 @@ export class CSVParserBlock extends BaseBlockExecutor {
   }
 
   /**
-   * Execute in mock mode - returns sample CSV data
+   * Execute in mock mode - parses real CSV input but simulates latency
+   * FIXED: Now processes actual input CSV instead of returning hardcoded values
    */
   private async executeMock(
     config: CSVParserConfig,
@@ -203,7 +204,39 @@ export class CSVParserBlock extends BaseBlockExecutor {
   ) {
     await this.sleep(100) // Simulate parsing latency
 
-    const mockOutput: CSVParserOutput = {
+    // Use real input CSV if available
+    const hasRealInput = input.csv && typeof input.csv === 'string' && input.csv.trim().length > 0
+
+    const result = hasRealInput
+      ? this.parseCSV(input.csv, config) // Parse real CSV input
+      : this.generateSampleCSV() // Generate sample for standalone testing
+
+    const executionTime = Date.now() - startTime
+
+    this.log(context, 'info', '🎭 Mock: CSV parsed', {
+      totalRows: result.metadata.totalRows,
+      totalColumns: result.metadata.totalColumns,
+      usingRealData: hasRealInput
+    })
+
+    return {
+      status: 'completed',
+      output: result,
+      executionTime,
+      error: undefined,
+      retryCount: 0,
+      startTime,
+      endTime: Date.now(),
+      metadata: { ...result.metadata, mock: true },
+      logs: []
+    }
+  }
+
+  /**
+   * Generate sample CSV for standalone testing (no real input data)
+   */
+  private generateSampleCSV(): CSVParserOutput {
+    return {
       headers: ['nome', 'celular', 'email', 'nascimento'],
       rows: [
         {
@@ -222,29 +255,10 @@ export class CSVParserBlock extends BaseBlockExecutor {
       metadata: {
         totalRows: 2,
         totalColumns: 4,
-        delimiter: config.delimiter || ';',
-        hasHeader: config.hasHeader !== false,
+        delimiter: ';',
+        hasHeader: true,
         emptyRowsSkipped: 0
       }
-    }
-
-    const executionTime = Date.now() - startTime
-
-    this.log(context, 'info', '🎭 Mock: CSV parsed', {
-      totalRows: mockOutput.metadata.totalRows,
-      totalColumns: mockOutput.metadata.totalColumns
-    })
-
-    return {
-      status: 'completed',
-      output: mockOutput,
-      executionTime,
-      error: undefined,
-      retryCount: 0,
-      startTime,
-      endTime: Date.now(),
-      metadata: { ...mockOutput.metadata, mock: true },
-      logs: []
     }
   }
 

@@ -300,12 +300,54 @@ export class FullContactSearchBlock extends BaseBlockExecutor {
   ) {
     await this.sleep(500) // Simulate API latency
 
+    this.log(context, 'info', '📡 FullContact API Details (Mock Mode):', {
+      endpoint: 'https://api.fullcontact.com/v3/person.enrich',
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer <FULLCONTACT_API_KEY>',
+        'Content-Type': 'application/json'
+      }
+    })
+
     const mockContacts: FullContactSearchOutput['contacts'] = input.contacts.map((contact, index) => {
       // 70% success rate in mock mode
       const found = index % 10 < 7
 
+      // Build mock request payload
+      const mockRequestPayload = {
+        email: contact.email,
+        name: contact.nome
+      }
+
+      this.log(context, 'info', `📤 [Contact ${index + 1}] Request Payload:`, {
+        email: mockRequestPayload.email,
+        name: mockRequestPayload.name,
+        url: `https://api.fullcontact.com/v3/person.enrich?email=${encodeURIComponent(mockRequestPayload.email || '')}`
+      })
+
       if (found) {
         const mockProfiles = this.getMockFullContactData(contact)
+
+        // Mock response payload
+        const mockResponsePayload = {
+          status: 200,
+          data: {
+            fullName: contact.nome,
+            emails: [{ value: contact.email, type: 'primary' }],
+            socialProfiles: mockProfiles.profiles,
+            demographics: mockProfiles.demographics,
+            interests: mockProfiles.interests
+          }
+        }
+
+        this.log(context, 'info', `📥 [Contact ${index + 1}] Response Payload:`, {
+          status: mockResponsePayload.status,
+          found: true,
+          profiles: mockResponsePayload.data.socialProfiles,
+          interests: mockResponsePayload.data.interests,
+          demographics: mockResponsePayload.data.demographics
+        })
+
         return {
           original: contact.original,
           fullcontact: {
@@ -320,6 +362,18 @@ export class FullContactSearchBlock extends BaseBlockExecutor {
           }
         }
       } else {
+        const mockResponsePayload = {
+          status: 404,
+          error: 'Profile not found',
+          message: 'No profile found for the given email address'
+        }
+
+        this.log(context, 'info', `📥 [Contact ${index + 1}] Response Payload:`, {
+          status: mockResponsePayload.status,
+          found: false,
+          error: mockResponsePayload.error
+        })
+
         return {
           original: contact.original,
           fullcontact: {

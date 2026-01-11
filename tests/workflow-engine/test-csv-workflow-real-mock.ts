@@ -45,10 +45,26 @@ async function testCSVWorkflowRealMock() {
       OPENROUTER_API_KEY: 'mock-key'
     },
     logger: {
-      debug: (msg: string) => console.log(`  [DEBUG] ${msg}`),
-      info: (msg: string) => console.log(`  [INFO] ${msg}`),
-      warn: (msg: string) => console.log(`  [WARN] ⚠️  ${msg}`),
-      error: (msg: string) => console.log(`  [ERROR] ❌ ${msg}`)
+      node: (nodeId: string, msg: string, meta?: any) => {
+        console.log(`  [${nodeId}] ${msg}`)
+        if (meta) console.log(`     Meta: ${JSON.stringify(meta, null, 2)}`)
+      },
+      debug: (msg: string, meta?: any) => {
+        console.log(`  [DEBUG] ${msg}`)
+        if (meta) console.log(`     ${JSON.stringify(meta, null, 2)}`)
+      },
+      info: (msg: string, meta?: any) => {
+        console.log(`  [INFO] ${msg}`)
+        if (meta) console.log(`     ${JSON.stringify(meta, null, 2)}`)
+      },
+      warn: (msg: string, meta?: any) => {
+        console.log(`  [WARN] ⚠️  ${msg}`)
+        if (meta) console.log(`     ${JSON.stringify(meta, null, 2)}`)
+      },
+      error: (msg: string, meta?: any) => {
+        console.log(`  [ERROR] ❌ ${msg}`)
+        if (meta) console.log(`     ${JSON.stringify(meta, null, 2)}`)
+      }
     }
   })
 
@@ -79,10 +95,39 @@ async function testCSVWorkflowRealMock() {
   const startTime = Date.now()
   const orchestrator = new WorkflowOrchestrator()
 
+  // Hook per vedere i dati tra i nodi
+  const originalLog = context.logger.info
+  let contactCounts: { [key: string]: number } = {}
+
+  context.logger.info = (msg: string, meta?: any) => {
+    originalLog(msg, meta)
+
+    // Log quando i dati passano tra i nodi
+    if (meta?.contacts !== undefined) {
+      const count = Array.isArray(meta.contacts) ? meta.contacts.length : 'N/A'
+      const nodeName = meta.nodeId || 'unknown'
+      contactCounts[nodeName] = count
+      console.log(`     👥 [${nodeName}] Contacts count: ${count}`)
+      if (Array.isArray(meta.contacts) && meta.contacts.length > 0 && meta.contacts.length <= 10) {
+        meta.contacts.forEach((c: any, idx: number) => {
+          console.log(`        [${idx + 1}] ${c.original?.nome || c.nome || 'N/A'} <${c.original?.email || c.email || 'N/A'}>`)
+        })
+      }
+    }
+  }
+
   try {
     const result = await orchestrator.execute(workflow, context, {
       csv: DUMMY_CSV
     })
+
+    console.log()
+    console.log('📊 Contact Flow Through Nodes:')
+    console.log('─'.repeat(70))
+    Object.entries(contactCounts).forEach(([node, count]) => {
+      console.log(`   ${node}: ${count} contacts`)
+    })
+    console.log('─'.repeat(70))
 
     const executionTime = Date.now() - startTime
 

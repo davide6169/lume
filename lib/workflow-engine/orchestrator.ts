@@ -53,8 +53,8 @@ function deepMerge(target: any, source: any): any {
 }
 
 /**
- * Smart merge for workflow data - handles arrays with ID-based merging
- * If arrays contain objects with 'id' field, merge by ID instead of concatenating
+ * Smart merge for workflow data - handles arrays with ID/email-based merging
+ * If arrays contain objects with 'id' or 'email' field, merge by that key instead of concatenating
  */
 function smartMerge(target: any, source: any): any {
   if (source === null || source === undefined) {
@@ -73,23 +73,44 @@ function smartMerge(target: any, source: any): any {
       const targetArray = target[arrayKey] as any[]
       const sourceArray = source[arrayKey] as any[]
 
-      // Check if items have 'id' field for smart merging
-      const hasIds = targetArray.some(item => item.id !== undefined) ||
-                     sourceArray.some(item => item.id !== undefined)
+      // Helper function to extract key value from item (handles nested 'original' field)
+      const getKeyValue = (item: any, key: string): string | undefined => {
+        if (item[key] !== undefined) return item[key]
+        if (item.original && item.original[key] !== undefined) return item.original[key]
+        return undefined
+      }
 
-      if (hasIds) {
-        // Merge by ID
+      // Priority 1: Check if items have 'id' field for smart merging
+      const hasIds = targetArray.some(item => getKeyValue(item, 'id') !== undefined) ||
+                     sourceArray.some(item => getKeyValue(item, 'id') !== undefined)
+
+      // Priority 2: Check if items have 'email' field for smart merging (contacts)
+      const hasEmails = !hasIds && (
+        targetArray.some(item => getKeyValue(item, 'email') !== undefined) ||
+        sourceArray.some(item => getKeyValue(item, 'email') !== undefined)
+      )
+
+      if (hasIds || hasEmails) {
+        // Determine the key to use for merging
+        const mergeKey = hasIds ? 'id' : 'email'
+
+        // Merge by the determined key (id or email)
         const mergedArray = [...targetArray]
-        const idMap = new Map(targetArray.map(item => [item.id, item]))
+        const keyMap = new Map(
+          targetArray
+            .filter(item => getKeyValue(item, mergeKey) !== undefined)
+            .map(item => [getKeyValue(item, mergeKey)!, item])
+        )
 
         for (const sourceItem of sourceArray) {
-          const id = sourceItem.id
-          if (idMap.has(id)) {
+          const keyValue = getKeyValue(sourceItem, mergeKey)
+
+          if (keyValue !== undefined && keyMap.has(keyValue)) {
             // Deep merge existing item
-            const existingItem = idMap.get(id)
+            const existingItem = keyMap.get(keyValue)
             const mergedItem = deepMerge(existingItem, sourceItem)
             // Replace in array
-            const index = mergedArray.findIndex(item => item.id === id)
+            const index = mergedArray.findIndex(item => getKeyValue(item, mergeKey) === keyValue)
             if (index !== -1) {
               mergedArray[index] = mergedItem
             }
@@ -112,7 +133,7 @@ function smartMerge(target: any, source: any): any {
     }
   }
 
-  // Default: use regular deep merge
+  // Default: use regular deep merge (concatenates arrays)
   return deepMerge(target, source)
 }
 
