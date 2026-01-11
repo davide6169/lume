@@ -271,8 +271,25 @@ export const csvInterestEnrichmentWorkflowV3: WorkflowDefinition = {
     { id: 'e10', source: 'skip-pdl', target: 'skip-merge' },
 
     // Layer 5 → Layer 6 (Output)
-    { id: 'e11', source: 'llm-merge-interests', target: 'csv-assemble' },
-    { id: 'e12', source: 'skip-merge', target: 'csv-assemble' }
+    // EDGE ADAPTERS: Map contacts output to rows input for csv-assembler
+    {
+      id: 'e11',
+      source: 'llm-merge-interests',
+      target: 'csv-assemble',
+      adapter: {
+        type: 'map',
+        mapping: { rows: 'contacts' }
+      }
+    },
+    {
+      id: 'e12',
+      source: 'skip-merge',
+      target: 'csv-assemble',
+      adapter: {
+        type: 'map',
+        mapping: { rows: 'contacts' }
+      }
+    }
   ],
 
   globals: {

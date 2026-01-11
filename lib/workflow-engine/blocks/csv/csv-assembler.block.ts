@@ -166,14 +166,33 @@ export class CSVAssemblerBlock extends BaseBlockExecutor {
     input.rows.forEach((rowItem) => {
       const assembledRow: Record<string, any> = { ...rowItem.original }
 
-      // Process interests
+      // Extract interests from multiple possible sources
+      // Priority: merged interests > FullContact > PDL
+      let interestsArray: string[] | undefined
+
+      // 1. Check for merged interests (from llm-merge) - new structure
+      if (rowItem.mergedInterests?.interests && Array.isArray(rowItem.mergedInterests.interests)) {
+        interestsArray = rowItem.mergedInterests.interests
+      }
+      // 2. Check for direct interests field (from llm-merge) - old structure
+      else if (rowItem.interests && Array.isArray(rowItem.interests)) {
+        interestsArray = rowItem.interests
+      }
+      // 3. Check FullContact enrichment
+      else if (rowItem.fullcontact?.interests && Array.isArray(rowItem.fullcontact.interests)) {
+        interestsArray = rowItem.fullcontact.interests
+      }
+      // 4. Check PDL enrichment
+      else if (rowItem.pdl?.interests && Array.isArray(rowItem.pdl.interests)) {
+        interestsArray = rowItem.pdl.interests
+      }
+
+      // Convert to string
       let interestsString = ''
-      if (rowItem.interests) {
-        if (Array.isArray(rowItem.interests)) {
-          interestsString = rowItem.interests.join(', ')
-        } else if (typeof rowItem.interests === 'string') {
-          interestsString = rowItem.interests
-        }
+      if (interestsArray && interestsArray.length > 0) {
+        interestsString = interestsArray.join(', ')
+      } else if (typeof rowItem.interests === 'string') {
+        interestsString = rowItem.interests
       }
 
       // Add interests column
@@ -247,7 +266,8 @@ export class CSVAssemblerBlock extends BaseBlockExecutor {
   }
 
   /**
-   * Execute in mock mode - returns sample assembled CSV
+   * Execute in mock mode - uses real input data but simulates assembly latency
+   * FIXED: Now processes actual input data instead of returning hardcoded values
    */
   private async executeMock(
     config: CSVAssemblerConfig,
@@ -257,26 +277,66 @@ export class CSVAssemblerBlock extends BaseBlockExecutor {
   ) {
     await this.sleep(100) // Simulate assembly latency
 
-    const mockOutput: CSVAssemblerOutput = {
+    // Use real input data if available, fallback to sample data for testing
+    const hasRealData = input.rows && input.rows.length > 0
+
+    const result = hasRealData
+      ? this.assembleCSV(input, config) // Process real data from workflow
+      : this.generateSampleCSV(config) // Generate sample for standalone testing
+
+    const executionTime = Date.now() - startTime
+
+    this.log(context, 'info', '🎭 Mock: CSV assembled', {
+      totalOutput: result.metadata.totalOutput,
+      withInterests: result.metadata.withInterests,
+      usingRealData: hasRealData
+    })
+
+    return {
+      status: 'completed',
+      output: result,
+      executionTime,
+      error: undefined,
+      retryCount: 0,
+      startTime,
+      endTime: Date.now(),
+      metadata: { ...result.metadata, mock: true },
+      logs: []
+    }
+  }
+
+  /**
+   * Generate sample CSV for standalone testing (no real input data)
+   */
+  private generateSampleCSV(config: CSVAssemblerConfig): CSVAssemblerOutput {
+    const interestsColumnName = config.interestsColumnName || 'interessi'
+    const delimiter = config.delimiter || ';'
+
+    const sampleRows = [
+      {
+        nome: 'Mario Rossi',
+        celular: '3291234567',
+        email: 'mario.rossi@mydomain.com',
+        nascimento: '21/02/1986',
+        [interestsColumnName]: 'calcio, tecnologia, viaggi'
+      },
+      {
+        nome: 'Luca Bianchi',
+        celular: '3282345678',
+        email: 'luca.bianchi@mydomain.com',
+        nascimento: '27/01/1983',
+        [interestsColumnName]: 'musica, programmazione, lettura'
+      }
+    ]
+
+    const headers = Object.keys(sampleRows[0])
+    const csvString = this.generateCSVString(headers, sampleRows, delimiter)
+
+    return {
       csv: {
-        headers: ['nome', 'celular', 'email', 'nascimento', 'interessi'],
-        rows: [
-          {
-            nome: 'Mario Rossi',
-            celular: '3291234567',
-            email: 'mario.rossi@mydomain.com',
-            nascimento: '21/02/1986',
-            interessi: 'calcio, tecnologia, viaggi'
-          },
-          {
-            nome: 'Luca Bianchi',
-            celular: '3282345678',
-            email: 'luca.bianchi@mydomain.com',
-            nascimento: '27/01/1983',
-            interessi: 'musica, programmazione, lettura'
-          }
-        ],
-        csvString: 'nome;celular;email;nascimento;interessi\nMario Rossi;3291234567;mario.rossi@mydomain.com;21/02/1986;calcio, tecnologia, viaggi\nLuca Bianchi;3282345678;luca.bianchi@mydomain.com;27/01/1983;musica, programmazione, lettura'
+        headers,
+        rows: sampleRows,
+        csvString
       },
       metadata: {
         totalInput: 2,
@@ -287,25 +347,6 @@ export class CSVAssemblerBlock extends BaseBlockExecutor {
         totalCost: 0.10,
         avgCostPerContact: 0.05
       }
-    }
-
-    const executionTime = Date.now() - startTime
-
-    this.log(context, 'info', '🎭 Mock: CSV assembled', {
-      totalOutput: mockOutput.metadata.totalOutput,
-      withInterests: mockOutput.metadata.withInterests
-    })
-
-    return {
-      status: 'completed',
-      output: mockOutput,
-      executionTime,
-      error: undefined,
-      retryCount: 0,
-      startTime,
-      endTime: Date.now(),
-      metadata: { ...mockOutput.metadata, mock: true },
-      logs: []
     }
   }
 
